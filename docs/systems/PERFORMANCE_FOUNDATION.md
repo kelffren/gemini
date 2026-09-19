@@ -58,6 +58,14 @@ Un feature sin trabajo no debe ejecutar lógica significativa cada frame. `KeloS
 
 La hotbar usa una fingerprint visual por slot para evitar reescrituras DOM cuando no cambió el contenido ni la décima visible de cooldown. El panel de Piedras filtra de forma segura entradas no-stone de inventarios mixtos.
 
+### Política de calidad y floors temporales
+
+`KELO_PERF` mantiene los perfiles normales `ultra → high → medium → performance`. El autotuner genérico termina en `performance`: no puede entrar por sí solo en perfiles reservados para una emergencia de dominio.
+
+`setQualityFloor(profile)` es la primitive reusable para pedir una **calidad máxima temporal en sentido de degradación**. `KELO_PERF` conserva solo esta primitive genérica en first-playable; los descriptores específicos de dominio viven en sus bundles lazy. PvP define `pvp_low` y `pvp_emergency` dentro de `pvp-auto-reducer.js`, por lo que el arranque social no paga bytes por perfiles PvP. El floor se compone con la política base/manual y nunca puede mejorar la calidad existente. Mientras existe un floor temporal, el autotuner base queda congelado; así no acumula una mejora oculta y al limpiar el floor vuelve exactamente a la política que gobernaba antes.
+
+Este contrato evita que un teléfono que ya arranca en `performance` pueda subir accidentalmente a `medium` cuando una feature intenta proteger rendimiento.
+
 ### GPU y memoria
 
 `KELO_ATLAS_CONTRACT` es la frontera de lifecycle de atlases gestionados. `core` permanece retenido; `district` y `optional` pueden quedar warm un intervalo corto y evictarse después si su refcount continúa en cero.
@@ -122,4 +130,4 @@ Antes de crear cualquier `PerformanceManager`, scheduler, asset loader, network 
 
 ## Estado
 
-**FOUNDATION ACTIVE — PERFORMANCE CONTRACT V1.1 / PVP-BIBLE SAFE**
+**FOUNDATION ACTIVE — PERFORMANCE CONTRACT V1.2 / MONOTONIC QUALITY FLOOR / PVP-BIBLE SAFE**

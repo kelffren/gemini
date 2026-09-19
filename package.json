@@ -114,7 +114,8 @@
     "audit:evolution": "node scripts/kelo-evolution-audit.mjs",
     "audit:evolution:sandbox": "node scripts/kelo-evolution-sandbox-audit.mjs",
     "evolution:map-forge": "node scripts/map-forge-evolution-autopilot.mjs",
-    "audit:library-build": "node scripts/library-build-flow-audit.mjs"
+    "audit:library-build": "node scripts/library-build-flow-audit.mjs",
+    "audit:pvp-auto-reducer": "node scripts/pvp-auto-reducer-audit.mjs"
   },
   "devDependencies": {
     "@cyclonedx/cyclonedx-npm": "6.0.1",

@@ -8,12 +8,16 @@ on:
       - 'src/core/module-loader.js'
       - 'src/systems/pvp-world.js'
       - 'src/systems/pvp-combat-runtime-loader.js'
+      - 'src/systems/pvp-auto-reducer.js'
+      - 'src/systems/performance-governor.js'
+      - 'scripts/pvp-auto-reducer-audit.mjs'
       - 'src/abilities/**'
       - 'engine-net.js'
       - 'src/ui/luxe-shell.js'
       - 'tests/pvp-dodge-live.spec.js'
       - 'tests/iphone-walk-8s.mjs'
       - 'bugs/registry/BUG-0004.json'
+      - 'bugs/registry/BUG-0005.json'
       - '.github/workflows/pvp-first-use-regression.yml'
   workflow_dispatch:
 
@@ -49,8 +53,12 @@ jobs:
         env:
           KELO_URL: http://127.0.0.1:4173/?guest=1&pvpRegressionWalk=1
         run: node tests/iphone-walk-8s.mjs
-      - name: Bug brief
+      - name: PvP first-use bug brief
         run: npm run bug:brief -- BUG-0004
+      - name: PvP AutoReducer bug brief
+        run: npm run bug:brief -- BUG-0005
+      - name: PvP AutoReducer contract
+        run: npm run audit:pvp-auto-reducer
       - name: Bug risk
         if: github.event_name == 'pull_request'
         run: npm run bug:risk -- "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"

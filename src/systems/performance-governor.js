@@ -1,18 +1,17 @@
 /* KELO-INDEX
  * area: PERFORMANCE
  * owner: KELO_PERF / KELO_PERFORMANCE_GOVERNOR
- * keys: FPS FRAME P50 P95 P99 STALL LOAF VISIBILITY LIFECYCLE QUALITY GOVERNOR HOOKS NETWORK MEMORY SAMPLED-SNAPSHOT
- * purpose: mide frame-time/carga real, gobierna calidad local y publica CLIENT_HIDDEN/CLIENT_VISIBLE sin crear otro lifecycle manager
- * public-api: KELO_PERF report/culling/quality/telemetry + visibility state
- * consumes: KeloEvents, KeloSimulation, KeloRender, mobile/atlas/world/network audits
- * state-owned: telemetría local, quality profile, clocks LOD y señales de visibilidad
- * online: solo diagnóstico/presentación local; nunca decide autoridad gameplay
- * do-not: NO crear otro game loop, NO usar performance para alterar verdad server
+ * keys: FPS FRAME QUALITY GOVERNOR NETWORK MEMORY
+ * purpose: client-only telemetry + presentation quality owner
+ * public-api: KELO_PERF
+ * state-owned: telemetry, quality profile, LOD clocks
+ * online: presentation only
+ * do-not: NO second loop; NO server-truth mutation
  */
 (function (root) {
   'use strict';
 
-  const VERSION = '1.3.0-sampled-snapshots';
+  const VERSION = '1.4.0-floor';
   const TARGET_FPS = 60;
   const TARGET_FRAME_MS = 1000 / TARGET_FPS;
   const SAMPLE_ALPHA = 0.08;
@@ -48,7 +47,7 @@
   let recentLoafs = Object.freeze([]);
   const isPhone = Math.min(root.innerWidth || 9999, root.innerHeight || 9999) <= 844;
   let profileIndex = isPhone ? 3 : 1;
-  let manualProfile = null;
+  let manualProfile = null, qualityFloor = null;
   let lastFrameAt = performance.now();
   let emaFrameMs = TARGET_FRAME_MS;
   let badMs = 0;
@@ -81,10 +80,8 @@
     return root[name];
   }
 
-  function profile() {
-    if (manualProfile) return PROFILES.find(p => p.id === manualProfile) || PROFILES[profileIndex];
-    return PROFILES[profileIndex];
-  }
+  function baseProfile(){return manualProfile?(PROFILES.find(p=>p.id===manualProfile)||PROFILES[profileIndex]):PROFILES[profileIndex];}
+  function profile(){const b=baseProfile(),f=qualityFloor;return f&&Number(f._rank)>PROFILES.indexOf(b)?f:b;}
 
   function recordFrame(frameMs) {
     if (!(frameMs > 0) || !Number.isFinite(frameMs)) return;
@@ -191,7 +188,7 @@
       frameSampleCount: telemetry.sampleCount, frameAverageMs: telemetry.averageMs, frameP50Ms: telemetry.p50Ms, frameP95Ms: telemetry.p95Ms, frameP99Ms: telemetry.p99Ms, worstFrameMs: telemetry.worstMs,
       framesOver16: telemetry.over16, framesOver33: telemetry.over33, framesOver50: telemetry.over50, framesOver100: telemetry.over100, framesOver120: telemetry.over120,
       hidden:document.hidden===true, visibilityResets, visibilityChanges, loafSupported, loafCount, worstLoafMs, recentLoafs,
-      quality: p.id, manualQuality: manualProfile, weightedCost: cost, weightedBudget: p.weightedBudget, pressure: cost / p.weightedBudget,
+      quality:p.id, baseQuality:baseProfile().id, manualQuality:manualProfile, qualityFloor:qualityFloor&&qualityFloor.id||null, weightedCost:cost, weightedBudget:p.weightedBudget, pressure:cost/p.weightedBudget,
       particleCap: p.particleCap, fxCap: p.fxCap, actorCutoff: p.actorCutoff, textureMB: textureMB(), counts: Object.freeze(counts),
       simulation:sim, render:render, mobile:mobile, network:net,
       assets:atlas ? Object.freeze({loaded:Array.isArray(atlas.loaded)?atlas.loaded.length:0,decodedTextureMB:Number(atlas.decodedTextureMB)||0,residentDistrictAtlasCount:Number(atlas.residentDistrictAtlasCount)||0}) : null,
@@ -215,7 +212,7 @@
   }
   function setProfileIndex(nextIndex) { const clamped = Math.max(0, Math.min(PROFILES.length - 1, nextIndex)); if (clamped === profileIndex) return; const previous = PROFILES[profileIndex]; profileIndex = clamped; dispatchQualityChange(previous, PROFILES[profileIndex]); }
   function autoTune(dt, snapshot) {
-    if (manualProfile || document.hidden) return;
+    if (manualProfile || qualityFloor || document.hidden) return;
     const overloaded = snapshot.fps < 52 || snapshot.frameMs > 19.2 || snapshot.pressure > 1.05;
     const healthy = snapshot.fps > 58 && snapshot.frameMs < 17.0 && snapshot.pressure < 0.72;
     if (overloaded) { badMs += dt; goodMs = Math.max(0, goodMs - dt * 2); }
@@ -277,11 +274,8 @@
   function shouldRenderActor(distance) { return Math.max(0, Number(distance) || 0) <= profile().actorCutoff; }
   function registerTexture(id, width, height, copies) { const w = Math.max(0, Number(width) || 0), h = Math.max(0, Number(height) || 0), c = Math.max(1, Number(copies) || 1); textureMemory.set(String(id), { bytes: w * h * 4 * c, width: w, height: h, copies: c }); }
   function unregisterTexture(id) { textureMemory.delete(String(id)); }
-  function setManualQuality(id) {
-    if (id == null || id === 'auto') { manualProfile = null; badMs = 0; goodMs = 0; return profile().id; }
-    const found = PROFILES.find(p => p.id === id); if (!found) throw new Error('Unknown Kelo quality profile: ' + id);
-    const previous = profile(); manualProfile = found.id; dispatchQualityChange(previous, found); return found.id;
-  }
+  function setManualQuality(id){const p=profile();if(id==null||id==='auto')manualProfile=null;else{const f=PROFILES.find(p=>p.id===id);if(!f)throw new Error('Unknown Kelo quality profile: '+id);manualProfile=f.id;}badMs=goodMs=0;const n=profile();if(p.id!==n.id)dispatchQualityChange(p,n);return n.id;}
+  function setQualityFloor(f){const p=profile();qualityFloor=f&&f!=='auto'?f:null;const n=profile();if(p.id!==n.id)dispatchQualityChange(p,n);return n.id;}
   function toggleHUD(force) { hudEnabled = typeof force === 'boolean' ? force : !hudEnabled; ensureHud(); if (hud) hud.style.display = hudEnabled ? 'block' : 'none'; try { localStorage.setItem('kelo_perf_hud', hudEnabled ? '1' : '0'); } catch (e) {} return hudEnabled; }
   function getSnapshot() { return refreshSnapshot(performance.now(),false); }
   function getFrameTelemetry() { const stats = refreshFrameStats(performance.now(), true); return Object.freeze({ ...stats, visibilityResets, visibilityChanges, loafSupported, loafCount, worstLoafMs, recentLoafs }); }
@@ -298,7 +292,7 @@
   const api = Object.freeze({
     version: VERSION, targetFps: TARGET_FPS, targetFrameMs: TARGET_FRAME_MS, frameWindow: FRAME_WINDOW, snapshotRefreshMs:SNAPSHOT_REFRESH_MS, weights: WEIGHTS, profiles: PROFILES,
     reportVisible, canSpawn, getAnimationHz, shouldUpdate, forgetUpdateKey, shouldRenderActor,
-    registerTexture, unregisterTexture, setManualQuality, toggleHUD, getSnapshot, getFrameTelemetry,
+    registerTexture, unregisterTexture, setManualQuality, setQualityFloor, toggleHUD, getSnapshot, getFrameTelemetry,
     get visible(){return document.hidden!==true;}, get profile() { return profile(); }
   });
 

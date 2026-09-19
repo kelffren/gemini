@@ -2,7 +2,7 @@
 system-id: pvp-auto-reducer
 owner: KeloPvPAutoReducer
 source: src/systems/pvp-auto-reducer.js
-contract-version: 1
+contract-version: 2
 -->
 
 # Kelo PvP Auto Reducer — adaptive presentation quality
@@ -29,7 +29,7 @@ Solo presentation/diagnóstico local:
 - jitter estimado;
 - fase `idle | monitoring | warning | reduced`;
 - hysteresis/tiempos de recuperación;
-- calidad manual previa para restaurarla;
+- quality floor PvP solicitado (`pvp_low | pvp_emergency | null`);
 - counters de warnings/reductions/restores.
 
 ## Estado que NO posee
@@ -61,15 +61,15 @@ PvP first-use
   → baseline + EMA + jitter
   → degradación sostenida
      → warning con grace period
-     → KELO_PERF.setManualQuality('medium')
-     → si empeora: 'performance'
+     → construir descriptor lazy `pvp_low` y pasarlo a `KELO_PERF.setQualityFloor(profile)`
+     → si empeora: descriptor lazy `pvp_emergency`
   → recuperación sostenida
-     → restaurar calidad previa / auto
+     → limpiar el floor y volver a la política base/manual previa
 ```
 
 ## Señal actual
 
-V1 usa profundidad de inputs PvP pendientes y avance del último ack como estimator. Es una señal de ruta útil, pero no se presenta como RTT server-native real.
+V2 usa profundidad de inputs PvP pendientes y avance del último ack como estimator. Es una señal de ruta útil, pero no se presenta como RTT server-native real.
 
 La extensión correcta futura es sustituir/mejorar el estimator con RTT/jitter medido por transporte manteniendo el mismo contrato de sample. No se crea un segundo `NetAuthority`.
 
@@ -92,17 +92,21 @@ Nunca se permite degradar corrección competitiva para “ganar FPS”.
 7. La recuperación usa hysteresis; no oscila calidad cada sample.
 8. Al salir de PvP/desconectarse/deshabilitarse restaura calidad y limpia el episodio.
 9. El aviso puede ser reconocido sin desactivar la protección.
-10. La feature se carga lazy con el paquete PvP, no en el first-playable social.
+10. La feature y sus descriptores `pvp_low`/`pvp_emergency` se cargan lazy con el paquete PvP; first-playable conserva solo la primitive genérica de floor en `KELO_PERF`.
+11. El quality floor es monotónico: nunca puede mejorar la calidad por encima del perfil base/manual actual.
+12. Mientras el floor está activo, `KELO_PERF` congela el autotuning base para que la recuperación vuelva exactamente al perfil previo, sin una mejora oculta acumulada.
+13. El autotuning genérico termina en `performance`; `pvp_low` y `pvp_emergency` son exclusivos de una solicitud explícita de floor.
+14. `FEATURE_PVP_AUTO_REDUCER=false` desactiva la protección al cargar el paquete; `setEnabled(false)` permite apagarla en caliente.
 
 ## Observabilidad
 
-`snapshot()` expone versión, fase, active/online, latency/jitter/baseline estimados, threshold, reduced/emergency, counters y último motivo.
+`snapshot()` expone versión, fase, active/online, latency/jitter/baseline estimados, threshold, `requestedQuality`, `effectiveQuality`, reduced/emergency, counters y último motivo.
 
 `KELO_PVP_AUTO_REDUCER_AUDIT` declara los invariantes de integración usados por QA.
 
 ## Tests / CI
 
-- `scripts/pvp-auto-reducer-audit.mjs` — contrato owner/scheduler/calidad/autoridad/lazy/no-loop.
+- `scripts/pvp-auto-reducer-audit.mjs` — contrato owner/scheduler/calidad/autoridad/lazy/no-loop + prueba determinista 390×844 de que el floor no puede subir calidad y restaura la política previa.
 - `npm run audit:pvp-facing` — frontera PvP existente.
 - `npm run audit:performance` — el owner de calidad y performance sigue intacto.
 - smoke móvil/PvP del Main Stability Gate.
