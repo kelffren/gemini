@@ -79,7 +79,7 @@ assert.equal(waterContext.nearWater,true);
 const buildingContext=resolver.contextAt(208,16);
 assert.equal(buildingContext.nearBuilding,true,'building edge must be discoverable through spatial index');
 
-const forestContext=resolver.contextAt(32,128);
+const forestContext=resolver.contextAt(32,200);
 assert.ok(forestContext.district.districts.includes('district:forest'));
 assert.ok(resolver.roleWeightMultiplier('canopy',forestContext)>resolver.roleWeightMultiplier('detail',forestContext),'forest district should prefer canopy');
 assert.equal(resolver.roleWeightMultiplier('structure',forestContext),0,'forest district must block structure');
