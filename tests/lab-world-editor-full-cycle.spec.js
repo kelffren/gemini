@@ -123,6 +123,19 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
   expect(response && response.status()).toBeLessThan(400);
 
   let studio = await openCreatorsWorld(page);
+  if (process.env.KELO_PROBE_ONLY === '1') {
+    fs.writeFileSync('test-results/lab-world-editor-open-probe.json', JSON.stringify({
+      commitUnderTest: process.env.KELO_CANDIDATE_SHA || null,
+      opened: true,
+      loadingFlag: await studio.getAttribute('data-kelo-world-loading'),
+      pageErrors,
+      consoleErrors,
+    }, null, 2));
+    await page.screenshot({ path: 'test-results/lab-world-editor-open-probe.png', fullPage: true });
+    expect(pageErrors).toEqual([]);
+    expect(consoleErrors.filter(row => /CREATOR_WORLD_STUDIO_MOUNT_FAILED|WORLD_EDIT_NOT_READY|WORLD_EDITOR_OPEN_TIMEOUT/.test(row))).toEqual([]);
+    return;
+  }
   const beforeObjects = await objectCount(studio);
   const beforeIds = new Set(await studio.locator('[data-entity]').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-entity')).filter(Boolean)));
 
