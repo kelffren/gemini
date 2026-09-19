@@ -14,6 +14,8 @@
     "audit:security:root": "npm audit --audit-level=critical",
     "audit:security:server": "npm audit --audit-level=high --omit=dev --prefix server",
     "audit:evergreen-quality": "node scripts/evergreen-quality-audit.mjs",
+    "audit:evergreen-runtime": "node scripts/evergreen-runtime-audit.mjs",
+    "test:evergreen:webkit": "playwright test tests/evergreen-runtime-compat.spec.js --config=playwright.evergreen.config.js",
     "test": "playwright test",
     "test:live": "playwright test",
     "test:browserstack": "browserstack-node-sdk playwright test",
@@ -48,7 +50,6 @@
     "audit:commerce": "node scripts/commerce-system-audit.js",
     "audit:arena": "node scripts/arena-system-audit.js",
     "audit:pvp-facing": "node scripts/pvp-aim-facing-audit.js",
-    "audit:pvp-auto-reducer": "node scripts/pvp-auto-reducer-audit.mjs",
     "audit:studio": "node scripts/studio-foundation-audit.mjs",
     "audit:studio:creator": "node scripts/studio-creator-v1-audit.mjs",
     "audit:studio:drag": "node scripts/studio-smooth-drag-audit.mjs",
@@ -113,8 +114,8 @@
     "audit:evolution": "node scripts/kelo-evolution-audit.mjs",
     "audit:evolution:sandbox": "node scripts/kelo-evolution-sandbox-audit.mjs",
     "evolution:map-forge": "node scripts/map-forge-evolution-autopilot.mjs",
-    "audit:evergreen-runtime": "node scripts/evergreen-runtime-audit.mjs",
-    "test:evergreen:webkit": "playwright test tests/evergreen-runtime-compat.spec.js --config=playwright.evergreen.config.js"
+    "audit:library-build": "node scripts/library-build-flow-audit.mjs",
+    "audit:pvp-auto-reducer": "node scripts/pvp-auto-reducer-audit.mjs"
   },
   "devDependencies": {
     "@cyclonedx/cyclonedx-npm": "6.0.1",
