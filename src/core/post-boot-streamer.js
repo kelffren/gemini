@@ -7,7 +7,7 @@
 (function(root){
   'use strict';
   if(root.KELO_POST_BOOT_STREAMER)return;
-  const VERSION='kelo-post-boot-streamer-v1';
+  const VERSION='kelo-post-boot-streamer-v2-idle-aware';
   const FILES=[
     'src/core/feature-registry.js?v=4',
     'src/core/asset-registry.js?v=2-feature-registry',
@@ -46,6 +46,17 @@
       document.body.appendChild(node);
     });
   }
+  function playerBusy(){
+    try{var i=root.input;return !!(i&&(i.active||i.touchActive||Math.abs(i.normX||0)>.02||Math.abs(i.normY||0)>.02));}catch(_){return false;}
+  }
+  function idleTurn(){
+    return new Promise(function(resolve){
+      if(document.hidden){setTimeout(resolve,700);return;}
+      if(playerBusy()){setTimeout(resolve,220);return;}
+      if('requestIdleCallback' in root){root.requestIdleCallback(function(){resolve();},{timeout:700});return;}
+      setTimeout(resolve,32);
+    });
+  }
   function yieldFrame(){
     return new Promise(function(resolve){
       requestAnimationFrame(function(){requestAnimationFrame(resolve);});
@@ -58,9 +69,10 @@
     audit.firstYieldAt=performance.now();
     try{root.dispatchEvent(new CustomEvent('kelo:instant-boot-playable',{detail:{at:audit.firstYieldAt,version:VERSION}}));}catch(_){}
     for(let i=0;i<FILES.length;i++){
+      await idleTurn();
+      while(playerBusy()||document.hidden) await new Promise(function(resolve){setTimeout(resolve,document.hidden?700:180);});
       await load(FILES[i]);
-      // Give touch/render a scheduling opportunity between cold owners.
-      if((i+1)%3===0) await new Promise(function(resolve){setTimeout(resolve,0);});
+      await yieldFrame();
     }
     audit.ready=true;
     try{root.dispatchEvent(new CustomEvent('kelo:post-boot-ready',{detail:{loaded:audit.loaded,failed:audit.failed.slice(),version:VERSION}}));}catch(_){}
