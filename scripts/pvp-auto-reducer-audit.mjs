@@ -24,15 +24,21 @@ assert.match(source,/setQualityFloor\(/,'quality changes must go through KELO_PE
 assert.doesNotMatch(source,/setManualQuality\(/,'AutoReducer must not override the player/device base quality');
 assert.match(source,/getPvpPendingCount/,'network estimator must consume existing NetAuthority signal');
 assert.match(source,/getLastPvpAck/,'ack progress signal missing');
+assert.match(source,/getSnapshot\(\)/,'frame-pressure estimator must consume existing KELO_PERF snapshot');
+assert.match(source,/frameP95Ms/,'frame p95 signal missing');
+assert.match(source,/frameBadFps:48/,'sustained frame-pressure threshold must remain explicit');
+assert.match(source,/frameCriticalP95Ms:50/,'critical long-frame threshold must remain explicit');
 assert.match(source,/recoverHoldMs/,'recovery hysteresis missing');
 assert.match(source,/warningCooldownMs/,'warning cooldown missing');
 assert.doesNotMatch(source,/requestAnimationFrame\s*\(/,'must not create a parallel frame loop');
 assert.doesNotMatch(source,/setInterval\s*\(/,'must not create a timer scheduler');
+assert.doesNotMatch(source,/new\s+PerformanceObserver|PerformanceObserver\s*\(/,'must reuse KELO_PERF telemetry instead of creating another frame observer');
 assert.doesNotMatch(source,/\b(?:damage|hp|maxHp|cooldown|mmr|rating)\s*=/i,'presentation reducer must not assign competitive truth');
 assert.match(source,/root\.KeloPvPAutoReducer=Object\.freeze/,'public API must remain immutable facade');
 assert.match(source,/usesExistingSimulation:true/,'audit contract must declare shared simulation');
 assert.match(source,/usesExistingQualityOwner:true/,'audit contract must declare shared quality owner');
 assert.match(source,/usesQualityFloor:true/,'audit contract must declare monotonic quality-floor integration');
+assert.match(source,/usesExistingFrameTelemetry:true/,'audit contract must declare shared frame telemetry');
 assert.match(source,/FEATURE_PVP_AUTO_REDUCER/,'kill switch must remain available');
 assert.match(source,/applyQuality\('pvp_low'/,'first reduction must be below PERFORMANCE');
 assert.match(source,/applyQuality\('pvp_emergency'/,'critical reduction must use the PvP emergency floor');
@@ -44,9 +50,9 @@ assert.match(perf,/manualProfile \|\| qualityFloor \|\| document\.hidden/,'autot
 assert.match(source,/inputBlocking:false/,'reducer must not block input');
 assert.match(source,/reload:false/,'reducer must remain hot/no-reload');
 
-assert.match(registry,/src\/systems\/pvp-auto-reducer\.js\?v=2/,'reducer must be lazy-loaded with PvP feature pack');
+assert.match(registry,/src\/systems\/pvp-auto-reducer\.js\?v=3/,'reducer must be lazy-loaded with PvP feature pack');
 const pvpIndex=registry.indexOf("pvp:{dependencies:");
-const reducerIndex=registry.indexOf("src/systems/pvp-auto-reducer.js?v=2");
+const reducerIndex=registry.indexOf("src/systems/pvp-auto-reducer.js?v=3");
 assert.ok(pvpIndex>=0&&reducerIndex>pvpIndex,'reducer must belong to PvP feature definition');
 
 assert.match(doc,/system-id:\s*pvp-auto-reducer/i,'technical doc must declare system identity');
@@ -97,4 +103,4 @@ assert.equal(owner.profile.id,'ultra','clearing the floor restores the pre-exist
 owner.setManualQuality('auto');
 assert.equal(owner.profile.id,'performance','returning to auto restores the phone base policy');
 
-console.log('PVP_AUTO_REDUCER_AUDIT_OK: monotonic owner-native adaptive presentation protection verified');
+console.log('PVP_AUTO_REDUCER_AUDIT_OK: monotonic network + frame-pressure protection verified');
