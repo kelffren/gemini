@@ -17,12 +17,16 @@ const source=fs.readFileSync('src/systems/pvp-auto-reducer.js','utf8');
 const registry=fs.readFileSync('src/core/feature-registry.js','utf8');
 const doc=fs.readFileSync('docs/systems/PVP_AUTO_REDUCER.md','utf8');
 const perf=fs.readFileSync('src/systems/performance-governor.js','utf8');
+const net=fs.readFileSync('engine-net.js','utf8');
 
 assert.match(source,/owner: KeloPvPAutoReducer/i,'owner marker missing');
 assert.match(source,/KeloSimulation\.after\(['"]pvp-auto-reducer:network-quality['"]/,'must schedule through KeloSimulation');
 assert.match(source,/setQualityFloor\(/,'quality changes must go through KELO_PERF quality-floor API');
 assert.doesNotMatch(source,/setManualQuality\(/,'AutoReducer must not override the player/device base quality');
-assert.match(source,/getPvpPendingCount/,'network estimator must consume existing NetAuthority signal');
+assert.match(source,/getPvpPendingCount/,'network estimator must retain pending-depth fallback');
+assert.match(source,/getPvpRttSnapshot/,'network estimator must prefer authoritative ack RTT');
+assert.match(net,/getPvpRttSnapshot/,'NetAuthority must expose ack RTT snapshot');
+assert.match(net,/authoritative-ack-roundtrip/,'RTT source must be identified explicitly');
 assert.match(source,/getLastPvpAck/,'ack progress signal missing');
 assert.match(source,/getSnapshot\(\)/,'frame-pressure estimator must consume existing KELO_PERF snapshot');
 assert.match(source,/frameP95Ms/,'frame p95 signal missing');
@@ -50,9 +54,9 @@ assert.match(perf,/manualProfile \|\| qualityFloor \|\| document\.hidden/,'autot
 assert.match(source,/inputBlocking:false/,'reducer must not block input');
 assert.match(source,/reload:false/,'reducer must remain hot/no-reload');
 
-assert.match(registry,/src\/systems\/pvp-auto-reducer\.js\?v=3/,'reducer must be lazy-loaded with PvP feature pack');
+assert.match(registry,/src\/systems\/pvp-auto-reducer\.js\?v=4/,'reducer must be lazy-loaded with PvP feature pack');
 const pvpIndex=registry.indexOf("pvp:{dependencies:");
-const reducerIndex=registry.indexOf("src/systems/pvp-auto-reducer.js?v=3");
+const reducerIndex=registry.indexOf("src/systems/pvp-auto-reducer.js?v=4");
 assert.ok(pvpIndex>=0&&reducerIndex>pvpIndex,'reducer must belong to PvP feature definition');
 
 assert.match(doc,/system-id:\s*pvp-auto-reducer/i,'technical doc must declare system identity');
@@ -128,7 +132,8 @@ const reducerContext={
   KeloNetAuthority:{
     isOnline:()=>true,
     getPvpPendingCount:()=>0,
-    getLastPvpAck:()=>Math.floor(clock/250)
+    getLastPvpAck:()=>Math.floor(clock/250),
+    getPvpRttSnapshot:()=>({rttMs:0,jitterMs:0,sampledAt:0})
   },
   KELO_PERF:{
     getSnapshot:()=>frameState,
@@ -150,4 +155,5 @@ for(const t of [16750,28750]){clock=t;reducerTick({dt:.25});}
 assert.equal(floorCalls.at(-1),null,'stable frame telemetry must release the temporary floor');
 assert.equal(reducerContext.KeloPvPAutoReducer.snapshot().lastReason,'recovered');
 
-console.log('PVP_AUTO_REDUCER_AUDIT_OK: monotonic network + frame-pressure protection verified');
+assert.match(source,/authoritative-ack-roundtrip-with-pending-depth-fallback/,'audit metadata must describe RTT-first fallback policy');
+console.log('PVP_AUTO_REDUCER_AUDIT_OK: authoritative ack RTT + fallback + frame-pressure protection verified');
