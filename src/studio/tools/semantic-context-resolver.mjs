@@ -67,10 +67,16 @@ export function createSemanticContextResolver(kernel,options={}){
     waterAffinity:clamp(options.waterAffinity,16,256,96),
     buildingAffinity:clamp(options.buildingAffinity,16,256,88)
   };
-  const zones=(document.zones||[]).map(zone=>{
-    const rect=rectFrom(zone);if(!rect)return null;
-    return{rect,rules:zoneRules(zone)};
-  }).filter(Boolean);
+  const zoneChunkSize=Math.max(128,Number(kernel.spatial?.chunkSize)||512),zones=[],zoneBuckets=new Map();
+  const zoneBucketKey=(x,y)=>String(x)+','+String(y);
+  for(const zone of document.zones||[]){
+    const rect=rectFrom(zone);if(!rect)continue;
+    const row={rect,rules:zoneRules(zone)};zones.push(row);
+    const minX=Math.floor(rect.x/zoneChunkSize),minY=Math.floor(rect.y/zoneChunkSize),maxX=Math.floor((rect.x+Math.max(0,rect.w-1))/zoneChunkSize),maxY=Math.floor((rect.y+Math.max(0,rect.h-1))/zoneChunkSize);
+    for(let cy=minY;cy<=maxY;cy++)for(let cx=minX;cx<=maxX;cx++){
+      const key=zoneBucketKey(cx,cy);if(!zoneBuckets.has(key))zoneBuckets.set(key,[]);zoneBuckets.get(key).push(row);
+    }
+  }
 
   function surfaceAt(x,y){
     const cell=document.terrain?.[keyFor(x,y,tileSize)]||null;
@@ -105,8 +111,8 @@ export function createSemanticContextResolver(kernel,options={}){
     return false;
   }
   function districtAt(x,y){
-    const only=new Set(),block=new Set(),prefer=new Set(),avoid=new Set(),districts=[],tags=[];
-    for(const zone of zones){
+    const only=new Set(),block=new Set(),prefer=new Set(),avoid=new Set(),districts=[],tags=[],bucket=zoneBuckets.get(zoneBucketKey(Math.floor(x/zoneChunkSize),Math.floor(y/zoneChunkSize)))||[];
+    for(const zone of bucket){
       if(!(x>=zone.rect.x&&x<=zone.rect.x+zone.rect.w&&y>=zone.rect.y&&y<=zone.rect.y+zone.rect.h))continue;
       for(const value of zone.rules.only)only.add(value);
       for(const value of zone.rules.block)block.add(value);
@@ -196,6 +202,6 @@ export function createSemanticContextResolver(kernel,options={}){
     settings:Object.freeze({...settings}),
     tileSize,
     surfaceAt,nearSurface,contextAt,describeAt,roleWeightMultiplier,rejectReason,
-    stats:()=>({zones:zones.length,terrainCells:Object.keys(document.terrain||{}).length})
+    stats:()=>({zones:zones.length,zoneBuckets:zoneBuckets.size,zoneChunkSize,terrainCells:Object.keys(document.terrain||{}).length})
   });
 }
