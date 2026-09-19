@@ -109,9 +109,12 @@ assert.equal(byStatus['area-of-interest'],'integrated');
 assert.equal(byStatus['creator-identity-reputation'],'integrated');
 assert.equal(byStatus['creator-permissions'],'integrated');
 assert.equal(byStatus['world-version-control'],'integrated');
+assert.equal(byStatus['persistent-world-state'],'integrated');
+assert.equal(byStatus['world-event-ledger'],'integrated');
 assert.equal(byStatus['world-partition'],'foundation-active');
-assert.equal(byStatus['persistent-world-state'],'foundation-active');
-assert.equal(byStatus['world-event-ledger'],'foundation-active');
+assert.equal(byStatus['authoritative-entity-replication'],'foundation-active');
 assert.equal(byStatus['mmo-trust-liveops-control-plane'],'foundation-active');
+assert.equal(bindings.bindings.filter(row=>row.status==='integrated').length,6,'Wave 1 must have exactly six integrated owners after world persistence');
+assert.equal(bindings.bindings.filter(row=>row.status==='foundation-active').length,3,'Wave 1 must leave exactly partition, entity replication and LiveOps as foundation-active');
 
 console.log(`MMORPG WAVE1 OWNER INTEGRATION AUDIT PASS bindings=${boundIds.length} integrated=${bindings.bindings.filter(x=>x.status==='integrated').length} foundation=${bindings.bindings.filter(x=>x.status==='foundation-active').length}`);
