@@ -76,21 +76,23 @@ export function createSemanticContextResolver(kernel,options={}){
     const cell=document.terrain?.[keyFor(x,y,tileSize)]||null;
     return{kind:classifySurfaceCell(cell),cell};
   }
-  function nearSurface(x,y,kind,distance){
-    const radius=Math.max(tileSize,Number(distance)||0),steps=Math.ceil(radius/tileSize);
-    const bx=Math.floor(Math.max(0,Number(x)||0)/tileSize)*tileSize;
-    const by=Math.floor(Math.max(0,Number(y)||0)/tileSize)*tileSize;
-    const limitSq=radius*radius;
-    let found=null,best=Infinity;
+  function surfaceNeighborhood(x,y){
+    const radius=Math.max(tileSize,settings.roadAffinity,settings.waterAffinity),steps=Math.ceil(radius/tileSize),bx=Math.floor(Math.max(0,Number(x)||0)/tileSize)*tileSize,by=Math.floor(Math.max(0,Number(y)||0)/tileSize)*tileSize;
+    const roadLimitSq=settings.roadAffinity*settings.roadAffinity,waterLimitSq=settings.waterAffinity*settings.waterAffinity;
+    let road=null,water=null,roadBest=Infinity,waterBest=Infinity;
     for(let oy=-steps;oy<=steps;oy++)for(let ox=-steps;ox<=steps;ox++){
-      const sx=bx+ox*tileSize,sy=by+oy*tileSize;
-      if(sx<0||sy<0)continue;
-      const key=String(Math.floor(sx))+','+String(Math.floor(sy));
-      const cell=document.terrain?.[key];if(classifySurfaceCell(cell)!==kind)continue;
+      const sx=bx+ox*tileSize,sy=by+oy*tileSize;if(sx<0||sy<0)continue;
+      const key=String(Math.floor(sx))+','+String(Math.floor(sy)),cell=document.terrain?.[key],kind=classifySurfaceCell(cell);
+      if(kind!=='path'&&kind!=='water')continue;
       const cx=sx+tileSize/2,cy=sy+tileSize/2,d2=(cx-x)*(cx-x)+(cy-y)*(cy-y);
-      if(d2<=limitSq&&d2<best){best=d2;found={x:sx,y:sy,w:tileSize,h:tileSize,cell};}
+      if(kind==='path'&&d2<=roadLimitSq&&d2<roadBest){roadBest=d2;road={x:sx,y:sy,w:tileSize,h:tileSize,cell,distance:Math.sqrt(d2)};}
+      if(kind==='water'&&d2<=waterLimitSq&&d2<waterBest){waterBest=d2;water={x:sx,y:sy,w:tileSize,h:tileSize,cell,distance:Math.sqrt(d2)};}
     }
-    return found?{...found,distance:Math.sqrt(best)}:null;
+    return{road,water};
+  }
+  function nearSurface(x,y,kind,distance){
+    const hit=surfaceNeighborhood(x,y)[kind==='path'?'road':'water'];
+    return hit&&hit.distance<=Math.max(tileSize,Number(distance)||0)?hit:null;
   }
   function rectTouchesSurface(rect,kind,clearance=0){
     const q=expand(rect,Math.max(0,Number(clearance)||0)),minX=Math.floor(Math.max(0,q.x)/tileSize)*tileSize,minY=Math.floor(Math.max(0,q.y)/tileSize)*tileSize;
@@ -130,7 +132,7 @@ export function createSemanticContextResolver(kernel,options={}){
     return bestDistance<=d?best:null;
   }
   function contextAt(x,y){
-    const surface=surfaceAt(x,y),road=nearSurface(x,y,'path',settings.roadAffinity),water=nearSurface(x,y,'water',settings.waterAffinity),building=nearbyBuilding(x,y),district=districtAt(x,y);
+    const surface=surfaceAt(x,y),neighborhood=surfaceNeighborhood(x,y),road=neighborhood.road,water=neighborhood.water,building=nearbyBuilding(x,y),district=districtAt(x,y);
     return{
       surface:surface.kind,onRoad:surface.kind==='path',onWater:surface.kind==='water',
       nearRoad:!!road,roadDistance:road?.distance??Infinity,
