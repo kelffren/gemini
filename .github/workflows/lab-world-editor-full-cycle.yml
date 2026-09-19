@@ -1,4 +1,4 @@
-name: LAB Bisect World Editor Regression
+name: LAB Parallel World Editor Bisect
 
 on:
   push:
@@ -10,9 +10,29 @@ permissions:
   contents: read
 
 jobs:
-  bisect:
+  candidate:
+    name: candidate-${{ matrix.short }}
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { short: "8b714787", sha: "8b7147875ad69dccfa99dea2f588488c05bcff4a" }
+          - { short: "819f8681", sha: "819f8681728d74d73f9f3a8a0ee2934aa4e82495" }
+          - { short: "2f7671af", sha: "2f7671af2e655f2abcf27c41bf601f86639681f7" }
+          - { short: "6304f937", sha: "6304f937308c22ed324b602d3641532fd4f75d3a" }
+          - { short: "7c8c58c1", sha: "7c8c58c1f1e1e99addfaa3ba1bf7dfa7b8515fd4" }
+          - { short: "32fc7e13", sha: "32fc7e138559d1b7543c9e56ceee1f0f2003164b" }
+          - { short: "f06b3384", sha: "f06b3384fb66ee0bf89aa6fc6ac53cdd67f4fc17" }
+          - { short: "5b723fd7", sha: "5b723fd79a500b6dd4bb1fe4d0880c4585dc4aa7" }
+          - { short: "d01c0276", sha: "d01c0276258e67e1ae3ce72e924ecb907d80a687" }
+          - { short: "8bcf451c", sha: "8bcf451cc0dfe895bc6786fd5ab5dba1373325d6" }
+
+    env:
+      CANDIDATE_SHA: ${{ matrix.sha }}
+      CANDIDATE_SHORT: ${{ matrix.short }}
+
     steps:
       - name: Checkout diagnostic branch
         uses: actions/checkout@v4
@@ -20,7 +40,6 @@ jobs:
           fetch-depth: 0
 
       - name: Preserve acceptance harness
-        shell: bash
         run: cp tests/lab-world-editor-full-cycle.spec.js /tmp/lab-world-editor-full-cycle.spec.js
 
       - name: Setup Node
@@ -28,115 +47,62 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Install diagnostic dependencies
+      - name: Install dependencies
         run: npm install --no-package-lock --no-audit --no-fund
 
-      - name: Install Chromium once
+      - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Walk parents until first healthy commit
+      - name: Test exact candidate
         shell: bash
         run: |
-          set -uo pipefail
-          mkdir -p bisect-evidence
+          set +e
+          git reset --hard "$CANDIDATE_SHA"
+          mkdir -p tests test-results candidate-evidence
+          cp /tmp/lab-world-editor-full-cycle.spec.js tests/lab-world-editor-full-cycle.spec.js
 
-          candidates=(
-            8b7147875ad69dccfa99dea2f588488c05bcff4a
-            819f8681728d74d73f9f3a8a0ee2934aa4e82495
-            2f7671af2e655f2abcf27c41bf601f86639681f7
-            6304f937308c22ed324b602d3641532fd4f75d3a
-            7c8c58c1f1e1e99addfaa3ba1bf7dfa7b8515fd4
-            32fc7e138559d1b7543c9e56ceee1f0f2003164b
-            f06b3384fb66ee0bf89aa6fc6ac53cdd67f4fc17
-            5b723fd79a500b6dd4bb1fe4d0880c4585dc4aa7
-            d01c0276258e67e1ae3ce72e924ecb907d80a687
-            8bcf451cc0dfe895bc6786fd5ab5dba1373325d6
-            72a486f7c0a70e213c6ba1c5599712a4390974c4
-            4b35ffb6537ad794846b4ad842f273d4128e6181
-            6f0ed2dfe57ddae042fc76db19a776a117a21f58
-            067710d72e7774d6f9cfe2d466b214782c5bdb50
-            ea0dc18a55007351cfdccb37fda5ed1faca9eac3
-            3cc96be30fdb4857c8b43b2897dd2e7be9e8a1c9
-            4542c4ebcd91cebdb2348959c0028b49245e5233
-            4b8bf368faece4532f807319c433758119c936f9
-          )
-
-          : > bisect-evidence/results.tsv
-
-          for sha in "${candidates[@]}"; do
-            short="${sha:0:8}"
-            echo "============================================================"
-            echo "TESTING $sha"
-            echo "============================================================"
-
-            git reset --hard "$sha"
-            mkdir -p tests test-results "bisect-evidence/$short"
-            cp /tmp/lab-world-editor-full-cycle.spec.js tests/lab-world-editor-full-cycle.spec.js
-            rm -rf test-results/*
-
-            python3 -m http.server 4173 --bind 127.0.0.1 > "/tmp/http-$short.log" 2>&1 &
-            server_pid=$!
-            ready=0
-            for i in {1..30}; do
-              if curl -fsS http://127.0.0.1:4173/ >/dev/null; then
-                ready=1
-                break
-              fi
-              sleep 1
-            done
-            if [ "$ready" -ne 1 ]; then
-              echo -e "$sha\tBAD\tserver-not-ready" | tee -a bisect-evidence/results.tsv
-              cp "/tmp/http-$short.log" "bisect-evidence/$short/http.log" || true
-              kill "$server_pid" 2>/dev/null || true
-              continue
-            fi
-
-            echo "FAST OPEN PROBE $short"
-            set +e
-            env -u CI KELO_PROBE_ONLY=1 KELO_CANDIDATE_SHA="$sha" KELO_PAGES=http://127.0.0.1:4173/               npx playwright test tests/lab-world-editor-full-cycle.spec.js --project=chromium --workers=1 --retries=0 --reporter=list               > "/tmp/probe-$short.log" 2>&1
-            probe_status=$?
-            set -e
-            cp "/tmp/probe-$short.log" "bisect-evidence/$short/probe.log" || true
-            if [ -d test-results ]; then cp -R test-results "bisect-evidence/$short/probe-results" || true; fi
-
-            if [ "$probe_status" -ne 0 ]; then
-              echo -e "$sha\tBAD\tworld-open" | tee -a bisect-evidence/results.tsv
-              kill "$server_pid" 2>/dev/null || true
-              wait "$server_pid" 2>/dev/null || true
-              continue
-            fi
-
-            echo "OPEN PASS. RUNNING FULL ACCEPTANCE $short"
-            rm -rf test-results/*
-            set +e
-            env -u CI KELO_CANDIDATE_SHA="$sha" KELO_PAGES=http://127.0.0.1:4173/               npx playwright test tests/lab-world-editor-full-cycle.spec.js --project=chromium --workers=1 --retries=0 --reporter=list               > "/tmp/full-$short.log" 2>&1
-            full_status=$?
-            set -e
-            cp "/tmp/full-$short.log" "bisect-evidence/$short/full.log" || true
-            if [ -d test-results ]; then cp -R test-results "bisect-evidence/$short/full-results" || true; fi
-
-            kill "$server_pid" 2>/dev/null || true
-            wait "$server_pid" 2>/dev/null || true
-
-            if [ "$full_status" -eq 0 ]; then
-              echo -e "$sha\tGOOD\tfull-acceptance" | tee -a bisect-evidence/results.tsv
-              echo "$sha" > bisect-evidence/HEALTHY_SHA.txt
-              echo "FIRST HEALTHY COMMIT: $sha"
-              exit 0
-            fi
-
-            echo -e "$sha\tBAD\tfull-acceptance" | tee -a bisect-evidence/results.tsv
+          python3 -m http.server 4173 --bind 127.0.0.1 > candidate-evidence/http.log 2>&1 &
+          pid=$!
+          ready=0
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then ready=1; break; fi
+            sleep 1
           done
 
-          echo "NO HEALTHY COMMIT IN THIS BATCH" | tee bisect-evidence/NO_HEALTHY_IN_BATCH.txt
-          exit 1
+          if [ "$ready" -ne 1 ]; then
+            echo "$CANDIDATE_SHA BAD server-not-ready" | tee candidate-evidence/result.txt
+            kill "$pid" 2>/dev/null || true
+            exit 0
+          fi
 
-      - name: Upload bisect evidence
+          env -u CI KELO_PROBE_ONLY=1 KELO_CANDIDATE_SHA="$CANDIDATE_SHA" KELO_PAGES=http://127.0.0.1:4173/             npx playwright test tests/lab-world-editor-full-cycle.spec.js --project=chromium --workers=1 --retries=0 --reporter=list             > candidate-evidence/probe.log 2>&1
+          probe=$?
+
+          if [ "$probe" -ne 0 ]; then
+            echo "$CANDIDATE_SHA BAD world-open" | tee candidate-evidence/result.txt
+            cp -R test-results candidate-evidence/probe-results 2>/dev/null || true
+            kill "$pid" 2>/dev/null || true
+            exit 0
+          fi
+
+          rm -rf test-results/*
+          env -u CI KELO_CANDIDATE_SHA="$CANDIDATE_SHA" KELO_PAGES=http://127.0.0.1:4173/             npx playwright test tests/lab-world-editor-full-cycle.spec.js --project=chromium --workers=1 --retries=0 --reporter=list             > candidate-evidence/full.log 2>&1
+          full=$?
+          cp -R test-results candidate-evidence/full-results 2>/dev/null || true
+          kill "$pid" 2>/dev/null || true
+
+          if [ "$full" -eq 0 ]; then
+            echo "$CANDIDATE_SHA GOOD full-acceptance" | tee candidate-evidence/result.txt
+          else
+            echo "$CANDIDATE_SHA BAD full-acceptance" | tee candidate-evidence/result.txt
+          fi
+          exit 0
+
+      - name: Upload candidate evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: world-editor-bisect-evidence
+          name: candidate-${{ matrix.short }}
           if-no-files-found: ignore
           retention-days: 14
-          path: |
-            bisect-evidence/**
+          path: candidate-evidence/**
