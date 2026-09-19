@@ -151,14 +151,25 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
 
   const canvas = page.locator('#game-canvas');
   await expect(canvas).toBeVisible({ timeout: 10000 });
-  const box = await canvas.boundingBox();
-  expect(box).not.toBeNull();
-  await canvas.tap({
-    position: {
-      x: Math.max(50, Math.min(box.width - 50, box.width * .52)),
-      y: Math.max(140, Math.min(box.height - 170, box.height * .46)),
-    },
-  });
+
+  // Historical mobile Studio versions commit placement through the precision
+  // pad's "COLOCAR AQUÍ" control. Newer versions may commit directly on canvas.
+  // Prefer the real mobile UI when it is present so the bisect follows the
+  // interaction contract of the candidate under test.
+  const placeHere = studio.locator('[data-place-action="commit"]:visible').first();
+  if (await placeHere.count()) {
+    await expect(placeHere).toBeVisible({ timeout: 10000 });
+    await placeHere.tap();
+  } else {
+    const box = await canvas.boundingBox();
+    expect(box).not.toBeNull();
+    await canvas.tap({
+      position: {
+        x: Math.max(50, Math.min(box.width - 50, box.width * .52)),
+        y: Math.max(140, Math.min(box.height - 170, box.height * .46)),
+      },
+    });
+  }
 
   await expect.poll(async () => objectCount(studio), { timeout: 20000 }).toBeGreaterThan(beforeObjects);
   const afterPlaceObjects = await objectCount(studio);
