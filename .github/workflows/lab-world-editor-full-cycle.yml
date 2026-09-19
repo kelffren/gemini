@@ -18,16 +18,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { short: "8b714787", sha: "8b7147875ad69dccfa99dea2f588488c05bcff4a" }
-          - { short: "819f8681", sha: "819f8681728d74d73f9f3a8a0ee2934aa4e82495" }
-          - { short: "2f7671af", sha: "2f7671af2e655f2abcf27c41bf601f86639681f7" }
-          - { short: "6304f937", sha: "6304f937308c22ed324b602d3641532fd4f75d3a" }
-          - { short: "7c8c58c1", sha: "7c8c58c1f1e1e99addfaa3ba1bf7dfa7b8515fd4" }
-          - { short: "32fc7e13", sha: "32fc7e138559d1b7543c9e56ceee1f0f2003164b" }
-          - { short: "f06b3384", sha: "f06b3384fb66ee0bf89aa6fc6ac53cdd67f4fc17" }
-          - { short: "5b723fd7", sha: "5b723fd79a500b6dd4bb1fe4d0880c4585dc4aa7" }
-          - { short: "d01c0276", sha: "d01c0276258e67e1ae3ce72e924ecb907d80a687" }
-          - { short: "8bcf451c", sha: "8bcf451cc0dfe895bc6786fd5ab5dba1373325d6" }
+          - { short: "72a486f7", sha: "72a486f7c0a70e213c6ba1c5599712a4390974c4" }
+          - { short: "4b35ffb6", sha: "4b35ffb6537ad794846b4ad842f273d4128e6181" }
+          - { short: "6f0ed2df", sha: "6f0ed2dfe57ddae042fc76db19a776a117a21f58" }
+          - { short: "067710d7", sha: "067710d72e7774d6f9cfe2d466b214782c5bdb50" }
+          - { short: "ea0dc18a", sha: "ea0dc18a55007351cfdccb37fda5ed1faca9eac3" }
+          - { short: "3cc96be3", sha: "3cc96be30fdb4857c8b43b2897dd2e7be9e8a1c9" }
+          - { short: "4542c4eb", sha: "4542c4ebcd91cebdb2348959c0028b49245e5233" }
+          - { short: "4b8bf368", sha: "4b8bf368faece4532f807319c433758119c936f9" }
+          - { short: "a1ce817d", sha: "a1ce817d1412fa4599a53fb464e99eb810c9c4b9" }
+          - { short: "0d6fd268", sha: "0d6fd268563b73208419b3397a18038f46412d77" }
+          - { short: "c9d13f15", sha: "c9d13f154957edcf5fa0c1123ea215de844c0454" }
+          - { short: "1995f6c1", sha: "1995f6c1baebf2f6c2495c0a5ee743432fcf2d30" }
 
     env:
       CANDIDATE_SHA: ${{ matrix.sha }}
