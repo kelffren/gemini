@@ -15,7 +15,12 @@
   <meta name="apple-mobile-web-app-title" content="KELO WORLD">
   <title>Kelo World — V6.69</title>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="src/ui/responsive-foundation.css?v=1">
+  <link rel="stylesheet" href="src/ui/responsive-foundation.css?v=1">\n  <link rel="preload" href="src/core/events/event-bus.js?v=1" as="script" fetchpriority="high">
+  <link rel="preload" href="src/core/input-lock-system.js?v=1" as="script" fetchpriority="high">
+  <link rel="preload" href="src/core/movement-profile.js?v=1" as="script" fetchpriority="high">
+  <link rel="preload" href="engine-a.js?v=151" as="script" fetchpriority="high">
+  <link rel="preload" href="src/core/input-system.js?v=2-zero-copy" as="script" fetchpriority="high">
+  <link rel="preload" href="src/core/movement-system.js?v=3-zero-garbage" as="script" fetchpriority="high">
   <style>
     *{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-user-select:none}
     html,body{width:100%;height:100%;overflow:hidden;background:#05070a}
@@ -171,24 +176,5 @@
 <script src="src/ui/luxe-player-hud.js?v=5-minimap-off-20260916"></script>
 <script src="src/systems/performance-governor.js?v=6"></script>
 <script>window.__keloBootReady=true;window.dispatchEvent(new Event("kelo:boot-ready"));window.__KELO_MINIMAP_PURGE__&&window.__KELO_MINIMAP_PURGE__();</script>\n<script src="src/core/warm-cache-client.js?v=1"></script>
-<script src="src/core/feature-registry.js?v=4"></script>
-<script src="src/core/asset-registry.js?v=2-feature-registry"></script>
-<script src="src/core/module-loader.js?v=10-feature-registry"></script>
-<script>window.KELO_MODULE_LOADER&&window.KELO_MODULE_LOADER.start({build:'V6.69'});</script>
-<script src="src/ui/asset-library-launcher.js?v=11-semantic-context"></script>
-<script src="src/core/settings-lazy-gate.js?v=3-update-intel"></script>
-<script src="src/core/hot-data-registry.js?v=1-transactional"></script>
-<script src="src/abilities/ability-balance-hot-owner.js?v=1"></script>
-<script src="src/systems/equipment-market-hot-owner.js?v=1"></script>
-<script src="src/systems/arena-progression-hot-owner.js?v=1"></script>
-<script src="src/systems/liveops-world-content-hot-owner.js?v=1"></script>
-<script src="src/systems/liveops-interaction-runtime.js?v=1"></script>
-<script src="src/systems/liveops-npc-world-runtime.js?v=1"></script>
-<script src="src/core/update-gate.js?v=8-hot-data"></script>
-<script src="src/core/session-continuity-system.js?v=2-update-classes"></script>
-<script src="src/core/session-continuity-retry.js?v=1-event-driven"></script>
-<script src="src/systems/admin-key-system.js?v=1"></script>
-<script src="src/core/admin-control-lazy-gate.js?v=2"></script>
-<script src="src/core/account-live-control-gate.js?v=2"></script>
-<script src="src/core/creators-lazy-gate.js?v=8-ios-open-20260917"></script>
+<script src="src/core/post-boot-streamer.js?v=1"></script>
 </body></html>
