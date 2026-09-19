@@ -108,7 +108,7 @@ async function walkRight(page, ms = 2500) {
 }
 
 test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen', async ({ page }) => {
-  test.setTimeout(180000);
+  test.setTimeout(process.env.KELO_PROBE_ONLY === '1' ? 75000 : 180000);
   fs.mkdirSync('test-results', { recursive: true });
 
   const pageErrors = [];
