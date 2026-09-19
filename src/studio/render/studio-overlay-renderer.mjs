@@ -103,6 +103,17 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     if(!drew){ctx.save();ctx.globalAlpha=.14;ctx.fillStyle='#e7c56a';ctx.fillRect(preview.x,preview.y,preview.w,preview.h);ctx.restore();}
     ctx.save();ctx.strokeStyle='rgba(231,197,106,.95)';drawRect(ctx,preview,{dashed:true});ctx.restore();
   }
+  function drawLibraryPalette(ctx,rows){
+    if(!rows?.length)return;
+    ctx.save();ctx.strokeStyle='rgba(126,213,154,.92)';
+    for(const row of rows){
+      const rect={x:Number(row.transform?.x)||0,y:Number(row.transform?.y)||0,w:Math.max(1,Number(row.bounds?.w)||1),h:Math.max(1,Number(row.bounds?.h)||1)};
+      const drew=assetPreview?.drawAsset?.(ctx,row.prefabId,rect.x,rect.y,{rotation:Number(row.transform?.rotation)||0,alpha:.62,placeholder:false});
+      if(!drew){ctx.save();ctx.globalAlpha=.13;ctx.fillStyle='#7ed59a';ctx.fillRect(rect.x,rect.y,rect.w,rect.h);ctx.restore();}
+      drawRect(ctx,rect,{dashed:true,alpha:.64});
+    }
+    ctx.restore();
+  }
   function drawPaintCopies(ctx,rows){
     if(!rows?.length)return;
     paintCopiesDiagnostics.drawCalls++;
@@ -153,6 +164,7 @@ export function createStudioOverlayRenderer({ kernel, tools, assetPreview } = {}
     drawRoomMeasurement(ctx,tools?.roomBuild?.getMeasurement?.());
     const placement = tools?.placement?.getPreview?.();if (placement) drawPlacement(ctx,placement);
     const prefab = tools?.prefabStamp?.getPreview?.();if(prefab)drawCreatorPrefab(ctx,prefab);
+    drawLibraryPalette(ctx,tools?.libraryPaletteBrush?.getPreviewRefs?.()||[]);
     if(isPaintCopiesEnabled()){
       const started=typeof performance!=='undefined'&&performance.now?performance.now():Date.now();
       try{
