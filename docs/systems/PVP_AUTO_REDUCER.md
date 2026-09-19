@@ -9,7 +9,7 @@ contract-version: 2
 
 ## Propósito
 
-`KeloPvPAutoReducer` protege la respuesta del PvP cuando la ruta input → ack muestra degradación sostenida. Observa señales del transporte existente y solicita perfiles temporales de calidad a `KELO_PERF`; no crea otro transporte, renderer, scheduler ni autoridad gameplay.
+`KeloPvPAutoReducer` protege la respuesta del PvP cuando la ruta input → ack muestra degradación sostenida **o** cuando el cliente ya está bajo presión real de frame. Reutiliza `KeloNetAuthority` y el snapshot existente de `KELO_PERF`; no crea otro transporte, renderer, scheduler, `PerformanceObserver` ni autoridad gameplay.
 
 El sistema implementa la parte PvP del Net Governor descrito por X-Foundation: degradación y recuperación con hysteresis, sin cambiar reglas competitivas.
 
@@ -27,6 +27,7 @@ Solo presentation/diagnóstico local:
 
 - baseline y EMA de latencia estimada;
 - jitter estimado;
+- FPS, frame EMA y frame p95 leídos desde `KELO_PERF`;
 - fase `idle | monitoring | warning | reduced`;
 - hysteresis/tiempos de recuperación;
 - quality floor PvP solicitado (`pvp_low | pvp_emergency | null`);
@@ -58,6 +59,7 @@ PvP first-use
   → Feature Registry carga pvp-auto-reducer.js
   → KeloSimulation.after('pvp-auto-reducer:network-quality', ...)
   → medir pending input/ack depth
+  → leer FPS/frame p95 del snapshot existente de `KELO_PERF`
   → baseline + EMA + jitter
   → degradación sostenida
      → warning con grace period
@@ -69,7 +71,7 @@ PvP first-use
 
 ## Señal actual
 
-V2 usa profundidad de inputs PvP pendientes y avance del último ack como estimator. Es una señal de ruta útil, pero no se presenta como RTT server-native real.
+V3 combina dos señales owner-native: profundidad/avance de input→ack para presión de red y `KELO_PERF.getSnapshot()` para presión de frame. La señal de red sigue siendo un estimator útil, no RTT server-native real. La señal de frame no crea otro observer: usa FPS, frame EMA y frame p95 ya calculados por Performance Foundation.
 
 La extensión correcta futura es sustituir/mejorar el estimator con RTT/jitter medido por transporte manteniendo el mismo contrato de sample. No se crea un segundo `NetAuthority`.
 
@@ -95,8 +97,9 @@ Nunca se permite degradar corrección competitiva para “ganar FPS”.
 10. La feature y sus descriptores `pvp_low`/`pvp_emergency` se cargan lazy con el paquete PvP; first-playable conserva solo la primitive genérica de floor en `KELO_PERF`.
 11. El quality floor es monotónico: nunca puede mejorar la calidad por encima del perfil base/manual actual.
 12. Mientras el floor está activo, `KELO_PERF` congela el autotuning base para que la recuperación vuelva exactamente al perfil previo, sin una mejora oculta acumulada.
-13. El autotuning genérico termina en `performance`; `pvp_low` y `pvp_emergency` son exclusivos de una solicitud explícita de floor.
-14. `FEATURE_PVP_AUTO_REDUCER=false` desactiva la protección al cargar el paquete; `setEnabled(false)` permite apagarla en caliente.
+13. El autotuning genérico sigue teniendo prioridad mientras pueda bajar calidad normal. El AutoReducer solo usa presión de frame para forzar por debajo de `performance` cuando el perfil base ya tocó ese piso, o ante stutter severo (p95 ≥ 50 ms).
+14. Los umbrales V3 son explícitos: degradación sostenida en el piso normal alrededor de ≤48 FPS / ≥22 ms EMA / ≥34 ms p95; crítico alrededor de ≤30 FPS / ≥33 ms EMA / ≥50 ms p95.
+15. `FEATURE_PVP_AUTO_REDUCER=false` desactiva la protección al cargar el paquete; `setEnabled(false)` permite apagarla en caliente.
 
 ## Observabilidad
 
