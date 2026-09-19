@@ -4,7 +4,7 @@
  * keys: LIBRARY BUILD FAST PLACE GHOST PERSONAL ASSET SCENE PAINTER MOBILE VAULT
  * owns: one-way handoff from integrated personal content into Studio's canonical placement tools
  * does-not-own: downloads, licensing, authority writes, world rendering or library navigation
- * public-api: startPersonalAssetPlacement(), listPersonalBuildTemplates(), ensureFastScenePainter()
+ * public-api: startPersonalAssetPlacement(), startPersonalAssetPalette(), listPersonalBuildTemplates(), ensureFastScenePainter(), ensureLibraryPaletteBrush()
  * online: all commits still flow through Studio placement/CommandBus/authority mirror
  */
 import {seedCatalogPrefabs} from '../adapters/catalog-prefab-seeder.mjs';
@@ -44,6 +44,18 @@ function screenCenter(root,session){
   try{const snap=root?.KeloCamera?.snapshot?.();if(Number.isFinite(snap?.x)&&Number.isFinite(snap?.y))return{x:Number(snap.x),y:Number(snap.y)};}catch{}
   return{x:0,y:0};
 }
+export async function ensureLibraryPaletteBrush(session,{root=globalThis}={}){
+  const studio=session?.studio,kernel=studio?.kernel,tools=studio?.tools;
+  if(!kernel||!tools)throw new Error('LIBRARY_PALETTE_STUDIO_NOT_READY');
+  if(tools.libraryPaletteBrush)return tools.libraryPaletteBrush;
+  const existing=kernel.tools?.get?.('libraryPaletteBrush');
+  if(existing){try{tools.libraryPaletteBrush=existing;}catch{}return existing;}
+  const mod=await import('../tools/library-palette-brush-tool.mjs');
+  const tool=mod.createLibraryPaletteBrushTool(kernel,{root});
+  kernel.tools.register(tool);
+  try{tools.libraryPaletteBrush=tool;}catch{}
+  return tool;
+}
 export async function ensureFastScenePainter(session){
   const studio=session?.studio,kernel=studio?.kernel,tools=studio?.tools;
   if(!kernel||!tools)return null;
@@ -82,6 +94,28 @@ async function startScene({root,session,assetId}){
   studio.tools.prefabStamp.move?.(point.x,point.y,{snap});
   return{mode:'prefab',prefabId:String(definition.id),template:definition,alternatives:[String(definition.id)],point,snap};
 }
+export async function startPersonalAssetPalette({root=globalThis,session,assetIds=[],maxTemplates=24}={}){
+  const ids=[...new Set((Array.isArray(assetIds)?assetIds:[]).map(text).filter(Boolean))].slice(0,16);
+  if(ids.length<2)throw new Error('LIBRARY_PALETTE_NEEDS_TWO_ASSETS');
+  const studio=session?.studio,kernel=studio?.kernel,catalog=catalogFor(root,session);
+  if(!studio||!kernel||!catalog)throw new Error('LIBRARY_PALETTE_STUDIO_NOT_READY');
+  for(const id of ids)await ensurePersonalVisualRegistered(root,id).catch(()=>false);
+  seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:catalog});
+  const prefabIds=[];const perAsset=Math.max(1,Math.min(4,Math.floor(Math.max(2,Number(maxTemplates)||24)/ids.length)||1));
+  for(const id of ids){
+    const rows=listPersonalBuildTemplates({root,session,assetId:id}).slice(0,perAsset);
+    for(const row of rows){if(prefabIds.length>=maxTemplates)break;prefabIds.push(String(row.id));}
+    if(prefabIds.length>=maxTemplates)break;
+  }
+  if(prefabIds.length<2)throw new Error('LIBRARY_PALETTE_TEMPLATES_NOT_READY');
+  session.setMode?.('select');
+  const tool=await ensureLibraryPaletteBrush(session,{root});
+  const snap=Math.max(1,Math.min(32,Number(session.snapSize)||Number(kernel.document?.settings?.tileSize)||16));
+  tool.configurePalette(prefabIds,{activate:true,snap,spacing:72,jitter:.55,avoidOverlap:true,maxPreview:120});
+  const detail=Object.freeze({assetIds:ids.slice(),prefabIds:prefabIds.slice(),variants:prefabIds.length,mode:'palette-brush'});
+  try{root.dispatchEvent?.(new CustomEvent('kelo:library-palette-ready',{detail}));}catch{}
+  return Object.freeze({mode:'palette-brush',assetIds:ids,prefabIds,variants:prefabIds.length,tool});
+}
 export async function startPersonalAssetPlacement({root=globalThis,session,assetId,templateId=null,prepareScenePainter=true}={}){
   const id=text(assetId);if(!id)throw new Error('LIBRARY_BUILD_ASSET_ID_REQUIRED');
   if(!session?.studio?.kernel)throw new Error('LIBRARY_BUILD_SESSION_REQUIRED');
@@ -95,4 +129,4 @@ export async function startPersonalAssetPlacement({root=globalThis,session,asset
   try{root.dispatchEvent?.(new CustomEvent('kelo:library-build-ready',{detail}));}catch{}
   return Object.freeze({...result,assetId:id,painterReady});
 }
-export const KELO_LIBRARY_BUILD_BRIDGE=Object.freeze({version:'kelo-library-build-bridge-v1',listPersonalBuildTemplates,choosePersonalBuildTemplate,ensureFastScenePainter,startPersonalAssetPlacement});
+export const KELO_LIBRARY_BUILD_BRIDGE=Object.freeze({version:'kelo-library-build-bridge-v2-palette',listPersonalBuildTemplates,choosePersonalBuildTemplate,ensureLibraryPaletteBrush,ensureFastScenePainter,startPersonalAssetPalette,startPersonalAssetPlacement});
