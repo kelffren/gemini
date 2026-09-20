@@ -20,6 +20,7 @@ import crypto from 'node:crypto';
 
 const ROOT = process.cwd();
 const OUT = path.join(ROOT, 'docs/generated/AI_CODE_MAP.json');
+const MD_OUT = path.join(ROOT, 'docs/generated/AI_CODE_MAP.md');
 const ROOTS = ['src', 'scripts', 'server', 'tests'];
 const EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx']);
 const SKIP = new Set(['node_modules', '.git', 'dist', 'build', 'coverage', 'vendor']);
