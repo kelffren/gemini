@@ -97,21 +97,30 @@ async function openCreatorsWorld(page) {
     // Historical ea14 can have its local developer Admin Key shadowed by the old
     // remote authority. mapEditor=1 explicitly enables the snapshot's own local-root
     // bootstrap, so use that public API only when world.edit is missing.
-    await page.evaluate(async () => {
+    const permissionState = await page.evaluate(async () => {
       const keys = window.KELO_ADMIN_KEYS;
-      if (!keys?.can?.('world.edit', keys.playerId?.()) && new URLSearchParams(location.search).get('mapEditor') === '1') {
+      const initialActor = String(keys?.playerId?.() || window.localPlayer?.id || 'local_pioneer');
+      let actorId = initialActor;
+      if (!keys?.can?.('world.edit', actorId) && new URLSearchParams(location.search).get('mapEditor') === '1') {
         keys.installRemoteAdapter?.(null);
-        const ownerId = keys.playerId?.() || 'local_pioneer';
-        await keys.request?.('admin-key:bootstrap-local-root', {
-          actorId: ownerId,
-          ownerId,
+        const issued = await keys.request?.('admin-key:bootstrap-local-root', {
+          actorId,
+          ownerId: actorId,
           developer: true,
         });
+        actorId = String(issued?.ownerId || actorId);
         keys.syncInventory?.();
       }
+      window.__KELO_LAB_EDITOR_ACTOR = actorId;
+      return {
+        actorId,
+        currentPlayerId: String(keys?.playerId?.() || ''),
+        allowedForIssuedActor: !!keys?.can?.('world.edit', actorId),
+        activeKeys: keys?.getActiveKeys?.(actorId) || [],
+        source: keys?.authoritySource?.() || null,
+      };
     });
-    const worldEditAllowed = await page.evaluate(() => !!window.KELO_ADMIN_KEYS?.can?.('world.edit', window.KELO_ADMIN_KEYS?.playerId?.()));
-    expect(worldEditAllowed).toBe(true);
+    expect(permissionState.allowedForIssuedActor).toBe(true);
     console.log('[LAB_STEP] WORLD_EDIT_PERMISSION_OK');
 
     // No prerequisite runtime globals are accepted as a proxy for a usable UI.
