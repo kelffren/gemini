@@ -1,6 +1,6 @@
 # ⚠️ LEY DEL REPO — LÉE ESTO PRIMERO
 
-Antes de modificar Kelo World, son obligatorios estos documentos:
+Antes de modificar Kelo World, empieza por [`AI_CONTEXT.md`](AI_CONTEXT.md) para resolver owner/ruta LIVE sin escanear el repo completo. Después son obligatorios estos documentos:
 
 1. [`docs/KELO_FOUNDATION.md`](docs/KELO_FOUNDATION.md) — **cómo está permitido construir y extender el proyecto**.
 2. [`ENGINE_MAP.md`](ENGINE_MAP.md) — **qué existe y quién manda en el runtime actual**.
