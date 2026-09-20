@@ -1,4 +1,4 @@
-name: LAB Direct World Freeze Anchors
+name: LAB Exact World Freeze Bisect
 
 on:
   push:
@@ -10,55 +10,99 @@ permissions:
   contents: read
 
 jobs:
-  anchor:
-    name: anchor-${{ matrix.short }}
+  exact-bisect:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { short: "GOOD-ea14e484", sha: "ea14e48426ac20aff44da009f0d615d8562cf7cd" }
-          - { short: "BAD-4d60d2e7", sha: "4d60d2e713b8fe853583309657448a983c688455" }
+    timeout-minutes: 35
+    env:
+      GOOD_SHA: ea14e48426ac20aff44da009f0d615d8562cf7cd
+      BAD_SHA: 4d60d2e713b8fe853583309657448a983c688455
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Preserve direct probe
+      - name: Preserve direct freeze probe
         run: cp tests/lab-world-open-bisect.spec.js /tmp/lab-world-open-bisect.spec.js
 
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
 
-      - name: Install Playwright runtime
-        run: npm install --no-package-lock --no-audit --no-fund && npx playwright install --with-deps chromium
+      - name: Install Playwright once
+        run: |
+          npm install --no-package-lock --no-audit --no-fund
+          npx playwright install --with-deps chromium
 
-      - name: Probe candidate
+      - name: Build bisect runner
+        shell: bash
+        run: |
+          cat > /tmp/world-freeze-bisect.sh <<'BASH'
+          #!/usr/bin/env bash
+          set +e
+          sha="$(git rev-parse HEAD)"
+          short="$(git rev-parse --short=8 HEAD)"
+          mkdir -p tests /tmp/world-bisect-logs
+          cp /tmp/lab-world-open-bisect.spec.js tests/lab-world-open-bisect.spec.js
+
+          python3 -m http.server 4173 --bind 127.0.0.1 > "/tmp/world-bisect-logs/http-$short.log" 2>&1 &
+          pid=$!
+          ready=0
+          for i in {1..25}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then ready=1; break; fi
+            sleep 0.4
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "$sha SKIP server-not-ready" | tee -a /tmp/world-bisect-logs/results.tsv
+            kill "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+            exit 125
+          fi
+
+          env -u CI KELO_PAGES=http://127.0.0.1:4173/             npx playwright test tests/lab-world-open-bisect.spec.js               --project=chromium --workers=1 --retries=0 --reporter=list               > "/tmp/world-bisect-logs/probe-$short.log" 2>&1
+          code=$?
+
+          kill "$pid" 2>/dev/null || true
+          wait "$pid" 2>/dev/null || true
+
+          if [ "$code" -eq 0 ]; then
+            printf "%s\tGOOD\n" "$sha" | tee -a /tmp/world-bisect-logs/results.tsv
+            exit 0
+          fi
+
+          printf "%s\tBAD\n" "$sha" | tee -a /tmp/world-bisect-logs/results.tsv
+          exit 1
+          BASH
+          chmod +x /tmp/world-freeze-bisect.sh
+
+      - name: Run exact git bisect
         shell: bash
         run: |
           set +e
-          git reset --hard "${{ matrix.sha }}"
-          mkdir -p tests evidence
-          cp /tmp/lab-world-open-bisect.spec.js tests/lab-world-open-bisect.spec.js
-          python3 -m http.server 4173 --bind 127.0.0.1 > evidence/http.log 2>&1 &
-          pid=$!
-          for i in {1..30}; do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
-          env -u CI KELO_PAGES=http://127.0.0.1:4173/ npx playwright test tests/lab-world-open-bisect.spec.js --project=chromium --workers=1 --retries=0 --reporter=list > evidence/probe.log 2>&1
-          code=$?
-          kill "$pid" 2>/dev/null || true
-          if [ "$code" -eq 0 ]; then
-            echo "${{ matrix.sha }} GOOD direct-world-open" | tee evidence/result.txt
-          else
-            echo "${{ matrix.sha }} BAD direct-world-open" | tee evidence/result.txt
+          mkdir -p evidence
+          git bisect reset >/dev/null 2>&1 || true
+          git bisect start "$BAD_SHA" "$GOOD_SHA" | tee evidence/bisect-start.txt
+          git bisect run /tmp/world-freeze-bisect.sh 2>&1 | tee evidence/bisect-run.txt
+          bisect_code="${PIPESTATUS[0]}"
+
+          cp /tmp/world-bisect-logs/results.tsv evidence/results.tsv 2>/dev/null || true
+          cp /tmp/world-bisect-logs/probe-*.log evidence/ 2>/dev/null || true
+          git bisect log > evidence/bisect.log 2>/dev/null || true
+
+          first_bad="$(git rev-parse HEAD)"
+          echo "$first_bad" | tee evidence/FIRST_BAD_SHA.txt
+          git show -s --format='%H%n%P%n%ad%n%s' --date=iso-strict "$first_bad" | tee evidence/FIRST_BAD_COMMIT.txt
+          parent="$(git rev-parse "$first_bad^1" 2>/dev/null || true)"
+          echo "$parent" | tee evidence/PARENT_SHA.txt
+          if [ -n "$parent" ]; then
+            git show -s --format='%H%n%P%n%ad%n%s' --date=iso-strict "$parent" | tee evidence/PARENT_COMMIT.txt
           fi
+          echo "bisect_code=$bisect_code" | tee evidence/BISECT_EXIT.txt
           exit 0
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: direct-world-${{ matrix.short }}
+          name: exact-world-freeze-bisect
           path: evidence/**
           retention-days: 14
