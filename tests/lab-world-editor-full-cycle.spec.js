@@ -63,6 +63,38 @@ async function kernelSnapshot(page) {
 }
 
 async function openCreatorsWorld(page) {
+  if (process.env.KELO_VISIBLE_FLOW === '1') {
+    await page.waitForFunction(() => !!(
+      window.KeloGuestPlay?.active?.() &&
+      window.KELO_ADMIN_KEYS?.can?.('world.edit') &&
+      window.KELO_LUXE?.toggleMenu &&
+      window.KELO_CREATORS_LAUNCHER
+    ), null, { timeout: 90000 });
+
+    const menu = page.locator('#lx-side-menu');
+    await expect(menu).toBeVisible({ timeout: 20000 });
+    const panel = page.locator('#lx-menu-panel');
+    const isOpen = await panel.evaluate(el => el.classList.contains('open')).catch(() => false);
+    if (!isOpen) await menu.tap();
+    await expect(panel).toHaveClass(/open/, { timeout: 10000 });
+
+    const creators = page.locator('#lx-create-studio');
+    await expect(creators).toBeVisible({ timeout: 20000 });
+    await creators.tap();
+
+    const hub = page.locator('#kelo-creators-hub:visible').last();
+    await expect(hub).toBeVisible({ timeout: 30000 });
+    const world = hub.locator('[data-workspace="world"]');
+    await expect(world).toBeVisible({ timeout: 10000 });
+    await world.tap();
+
+    const studio = page.locator('#kelo-studio-live');
+    await expect(studio).toBeVisible({ timeout: 30000 });
+    await expect(studio.locator('.ks-status')).toBeVisible({ timeout: 30000 });
+    await expect(studio).not.toHaveAttribute('data-kelo-world-loading', '1', { timeout: 50000 });
+    return studio;
+  }
+
   // mapEditor=1 can auto-open Creators. Reuse that visible Hub instead of
   // calling openCreatorHub a second time and creating a duplicate test artifact.
   await page.waitForTimeout(800);
@@ -148,7 +180,7 @@ async function walkRight(page, ms = 2500) {
 }
 
 test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen', async ({ page }) => {
-  test.setTimeout(process.env.KELO_PROBE_ONLY === '1' ? 75000 : 180000);
+  test.setTimeout(process.env.KELO_PROBE_ONLY === '1' ? 120000 : 240000);
   fs.mkdirSync('test-results', { recursive: true });
 
   const pageErrors = [];
@@ -156,8 +188,11 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
   page.on('pageerror', e => pageErrors.push(String(e?.stack || e)));
   page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
 
-  const response = await page.goto('./?guest=1&mapEditor=1&lab4d60d2e=2', {
-    waitUntil: 'domcontentloaded',
+  const visibleFlow = process.env.KELO_VISIBLE_FLOW === '1';
+  const response = await page.goto(visibleFlow
+    ? './?guest=1&worldPlacementFunctional=1&labVisibleFlow=1'
+    : './?guest=1&mapEditor=1&lab4d60d2e=2', {
+    waitUntil: visibleFlow ? 'commit' : 'domcontentloaded',
     timeout: 30000,
   });
   expect(response && response.status()).toBeLessThan(400);
