@@ -119,7 +119,9 @@
     "audit:semantic-context": "node scripts/semantic-context-audit.mjs",
     "context:build": "node scripts/ai-context-compiler.mjs",
     "audit:ai-context": "node scripts/ai-context-audit.mjs",
-    "context:ask": "node scripts/ai-context-query.mjs"
+    "context:ask": "node scripts/ai-context-query.mjs",
+    "context:history": "node scripts/ai-context-history.mjs",
+    "context:refresh": "npm run context:build && npm run audit:ai-context"
   },
   "devDependencies": {
     "@cyclonedx/cyclonedx-npm": "6.0.1",
