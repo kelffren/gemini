@@ -99,28 +99,41 @@ async function openCreatorsWorld(page) {
     // bootstrap, so use that public API only when world.edit is missing.
     const permissionState = await page.evaluate(async () => {
       const keys = window.KELO_ADMIN_KEYS;
-      const initialActor = String(keys?.playerId?.() || window.localPlayer?.id || 'local_pioneer');
-      let actorId = initialActor;
-      if (!keys?.can?.('world.edit', actorId) && new URLSearchParams(location.search).get('mapEditor') === '1') {
-        keys.installRemoteAdapter?.(null);
-        const issued = await keys.request?.('admin-key:bootstrap-local-root', {
-          actorId,
-          ownerId: actorId,
-          developer: true,
-        });
-        actorId = String(issued?.ownerId || actorId);
+      if (!keys) return { allowedForCurrentActor: false, actorId: null, seen: [] };
+      keys.installRemoteAdapter?.(null);
+
+      const seen = [];
+      if (new URLSearchParams(location.search).get('mapEditor') === '1') {
+        for (let i = 0; i < 8; i++) {
+          const actorId = String(keys.playerId?.() || window.localPlayer?.id || 'local_pioneer');
+          if (!seen.includes(actorId)) seen.push(actorId);
+          if (!keys.can?.('world.edit', actorId)) {
+            await keys.request?.('admin-key:bootstrap-local-root', {
+              actorId,
+              ownerId: actorId,
+              developer: true,
+            });
+          }
+          keys.syncInventory?.();
+          await new Promise(resolve => setTimeout(resolve, 120));
+        }
+      }
+
+      const actorId = String(keys.playerId?.() || window.localPlayer?.id || 'local_pioneer');
+      if (!keys.can?.('world.edit', actorId) && new URLSearchParams(location.search).get('mapEditor') === '1') {
+        await keys.request?.('admin-key:bootstrap-local-root', { actorId, ownerId: actorId, developer: true });
         keys.syncInventory?.();
       }
       window.__KELO_LAB_EDITOR_ACTOR = actorId;
       return {
         actorId,
-        currentPlayerId: String(keys?.playerId?.() || ''),
-        allowedForIssuedActor: !!keys?.can?.('world.edit', actorId),
-        activeKeys: keys?.getActiveKeys?.(actorId) || [],
-        source: keys?.authoritySource?.() || null,
+        seen,
+        allowedForCurrentActor: !!keys.can?.('world.edit', actorId),
+        activeKeys: keys.getActiveKeys?.(actorId) || [],
+        source: keys.authoritySource?.() || null,
       };
     });
-    expect(permissionState.allowedForIssuedActor).toBe(true);
+    expect(permissionState.allowedForCurrentActor).toBe(true);
     console.log('[LAB_STEP] WORLD_EDIT_PERMISSION_OK');
 
     // No prerequisite runtime globals are accepted as a proxy for a usable UI.
