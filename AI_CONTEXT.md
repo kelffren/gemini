@@ -65,6 +65,12 @@ Canonical deeper docs:
 - Personal scene content already hands off through `KELO_PERSONAL_SCENES` to Studio `prefabStamp`.
 - Never add a feature to normal boot merely to make it easier to access.
 
+## Machine context layer
+
+For large/fresh sessions, generate the machine-readable map with `npm run context:build` and inspect `docs/generated/AI_CODE_MAP.json`. It indexes KELO-INDEX metadata, owner symbols, imports/exports, event names, and QA/audit commands without loading the whole repository into model context. Validate it with `npm run audit:ai-context`.
+
+The generated map is a locator, never runtime truth. Confirm LIVE reachability through `index.html` / `KELO_MODULE_LOADER` before changing behavior.
+
 ## Fast search protocol for an AI
 
 When a request arrives, do not scan the whole repository.
