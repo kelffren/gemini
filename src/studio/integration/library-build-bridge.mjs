@@ -9,6 +9,7 @@
  */
 import {seedCatalogPrefabs} from '../adapters/catalog-prefab-seeder.mjs';
 import {buildSemanticPalette,semanticRoleCounts} from '../tools/semantic-brush-profile.mjs';
+import {prepareSceneImport,sceneHealth} from './scene-fabric.mjs';
 
 const text=value=>String(value??'').trim();
 
@@ -89,11 +90,21 @@ async function startScene({root,session,assetId}){
   try{api.installIntoStudio?.(studio);}catch{}
   const row=api.get?.(String(assetId)),definition=row?.manifest?.prefabDefinition;
   if(!definition?.id)return null;
+  const manifest=row?.manifest?.sceneManifest||{
+    sceneId:String(row?.manifest?.sceneId||definition.id),
+    version:Number(row?.manifest?.version)||1,
+    label:definition.label||definition.id,
+    dependencies:[...new Set((definition.children||[]).map(child=>String(child?.prefabId||'')).filter(Boolean))],
+    instances:(definition.children||[]).map((child,index)=>({instanceId:String(child?.id||`${definition.id}:child:${index}`),assetId:String(child?.prefabId||''),transform:{x:Number(child?.dx)||0,y:Number(child?.dy)||0,rotation:Number(child?.rotation)||0,scale:Number(child?.scale)||1},layer:String(child?.layer||'world')}))
+  };
+  const hasAsset=id=>!!studio.kernel?.prefabs?.resolve?.(String(id));
+  const ensureAsset=async id=>{try{api.installIntoStudio?.(studio);}catch{}return hasAsset(id);};
+  const staged=await prepareSceneImport(manifest,{hasAsset,ensureAsset,maxInstances:2500});
   studio.tools.prefabStamp.start(definition.id);
   session.setMode?.('prefab');
   const point=screenCenter(root,session),snap=Math.max(1,Number(session.snapSize)||Number(studio.kernel?.document?.settings?.tileSize)||32);
   studio.tools.prefabStamp.move?.(point.x,point.y,{snap});
-  return{mode:'prefab',prefabId:String(definition.id),template:definition,alternatives:[String(definition.id)],point,snap};
+  return{mode:'prefab',prefabId:String(definition.id),template:definition,alternatives:[String(definition.id)],point,snap,sceneStage:staged,sceneHealth:sceneHealth(staged)};
 }
 export async function startPersonalAssetPalette({root=globalThis,session,assetIds=[],maxTemplates=24}={}){
   const ids=[...new Set((Array.isArray(assetIds)?assetIds:[]).map(text).filter(Boolean))].slice(0,16);
@@ -132,4 +143,4 @@ export async function startPersonalAssetPlacement({root=globalThis,session,asset
   try{root.dispatchEvent?.(new CustomEvent('kelo:library-build-ready',{detail}));}catch{}
   return Object.freeze({...result,assetId:id,painterReady});
 }
-export const KELO_LIBRARY_BUILD_BRIDGE=Object.freeze({version:'kelo-library-build-bridge-v4-context',listPersonalBuildTemplates,choosePersonalBuildTemplate,ensureLibraryPaletteBrush,ensureFastScenePainter,startPersonalAssetPalette,startPersonalAssetPlacement});
+export const KELO_LIBRARY_BUILD_BRIDGE=Object.freeze({version:'kelo-library-build-bridge-v5-scene-fabric',listPersonalBuildTemplates,choosePersonalBuildTemplate,ensureLibraryPaletteBrush,ensureFastScenePainter,startPersonalAssetPalette,startPersonalAssetPlacement});
