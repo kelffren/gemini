@@ -22,3 +22,11 @@ const duplicate={...manifest,instances:[manifest.instances[0],{...manifest.insta
 assert.match(stageScene(duplicate,{hasAsset:()=>true}).errors.join('|'),/DUPLICATE_INSTANCE/);
 assert.equal(stageScene({...manifest,instances:Array.from({length:3},(_,i)=>({assetId:'asset:tree',instanceId:'x'+i}))},{hasAsset:()=>true,maxInstances:2}).status,'blocked');
 console.log('PASS scene-fabric-audit: manifests resolve dependencies and block unsafe scene imports before mutation');
+
+import fs from 'node:fs';
+const bridgeSource=fs.readFileSync(new URL('../src/studio/integration/library-build-bridge.mjs',import.meta.url),'utf8');
+assert.match(bridgeSource,/prepareSceneImport/,'library scene handoff must stage before prefab preview');
+assert.match(bridgeSource,/maxInstances:2500/,'library scene handoff must enforce a bounded mobile scene size');
+assert.match(bridgeSource,/sceneHealth\(staged\)/,'library scene handoff must expose measurable scene health');
+assert.doesNotMatch(bridgeSource,/KELO_WORLD_EDIT/,'Scene Fabric handoff must never bypass Studio authority');
+console.log('PASS scene-fabric-library-gate: one-tap scenes are staged before canonical prefab placement');
