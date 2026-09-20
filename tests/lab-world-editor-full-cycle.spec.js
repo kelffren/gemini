@@ -230,7 +230,7 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
   }, newX);
   await expect.poll(async () => {
     const snap = await kernelSnapshot(page);
-    return snap.entities.find(row => row.id === ${entityId})?.x;
+    return snap.entities.find(row => row.id === entityId)?.x;
   }, { timeout: 10000 }).toBe(newX);
 
   const close = studio.locator('[data-act="close"]:visible').first();
