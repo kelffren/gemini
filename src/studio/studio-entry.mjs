@@ -8,39 +8,53 @@
  */
 
 async function loadStudioCore(root,phoneBoot){
+  const CORE_IMPORT_TIMEOUT_MS=phoneBoot?7000:12000;
   const {yieldStudioBoot,setWorldLaunchStatus}=await import('./integration/studio-boot-pace.mjs');
   const wait=async()=>{await yieldStudioBoot(root);if(phoneBoot)await new Promise(resolve=>(root.setTimeout||setTimeout)(resolve,32));};
   const abort=()=>{if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');};
-  setWorldLaunchStatus(root,'Cargando núcleo…');
-  const kernelMod=await import('./core/studio-kernel.mjs');await wait();abort();
-  const documentMod=await import('./document/world-document.mjs');await wait();abort();
-  const adapterMod=await import('./adapters/kelo-runtime-adapter.mjs');await wait();abort();
-  setWorldLaunchStatus(root,'Cargando herramientas…');
+  const isolatedImport=async(label,specifier)=>{
+    abort();
+    setWorldLaunchStatus(root,`Cargando ${label}…`);
+    let timer=null;
+    const waitTimer=typeof root?.setTimeout==='function'?root.setTimeout.bind(root):setTimeout;
+    const cancel=typeof root?.clearTimeout==='function'?root.clearTimeout.bind(root):clearTimeout;
+    try{
+      const mod=await Promise.race([
+        import(specifier),
+        new Promise((_,reject)=>{timer=waitTimer(()=>reject(new Error(`WORLD_EDITOR_MODULE_TIMEOUT:${label}`)),CORE_IMPORT_TIMEOUT_MS);})
+      ]);
+      await wait();abort();
+      return mod;
+    }catch(error){
+      try{root.sessionStorage?.setItem?.('kelo:studio:last-failed-module',JSON.stringify({label,specifier,at:Date.now(),message:String(error?.message||error)}));}catch{}
+      throw error;
+    }finally{if(timer!=null)cancel(timer);}
+  };
+  const kernelMod=await isolatedImport('núcleo/kernel','./core/studio-kernel.mjs');
+  const documentMod=await isolatedImport('núcleo/documento','./document/world-document.mjs');
+  const adapterMod=await isolatedImport('núcleo/runtime','./adapters/kelo-runtime-adapter.mjs');
   let toolsMod=null;
   if(phoneBoot){
-    // A10: never import the static 7-tool barrel on iPhone; serial file has zero static deps.
-    const serialMod=await import('./tools/register-core-tools-serial.mjs');
+    const serialMod=await isolatedImport('herramientas/core','./tools/register-core-tools-serial.mjs');
     toolsMod={registerCoreTools:null,registerCoreToolsSerial:serialMod.registerCoreToolsSerial};
   }else{
-    toolsMod=await import('./tools/register-core-tools.mjs');
+    toolsMod=await isolatedImport('herramientas/core','./tools/register-core-tools.mjs');
   }
-  await wait();abort();
-  const seederMod=await import('./adapters/catalog-prefab-seeder.mjs');await wait();abort();
-  const componentsMod=await import('./components/kelo-components.mjs');await wait();abort();
-  const importerMod=await import('./adapters/current-world-importer.mjs');await wait();abort();
-  setWorldLaunchStatus(root,'Cargando servicios…');
-  const previewMod=await import('./render/studio-asset-preview-service.mjs?v=semantic-brush-1');await wait();abort();
-  const storeMod=await import('./storage/indexeddb-studio-store.mjs');await wait();abort();
-  const profilerMod=await import('./performance/studio-profiler.mjs');await wait();abort();
-  const compilerMod=await import('./compiler/world-compiler.mjs');await wait();abort();
+  const seederMod=await isolatedImport('herramientas/catálogo','./adapters/catalog-prefab-seeder.mjs');
+  const componentsMod=await isolatedImport('herramientas/componentes','./components/kelo-components.mjs');
+  const importerMod=await isolatedImport('herramientas/importador','./adapters/current-world-importer.mjs');
+  const previewMod=await isolatedImport('servicios/preview','./render/studio-asset-preview-service.mjs?v=semantic-brush-1');
+  const storeMod=await isolatedImport('servicios/almacenamiento','./storage/indexeddb-studio-store.mjs');
+  const profilerMod=await isolatedImport('servicios/profiler','./performance/studio-profiler.mjs');
+  const compilerMod=await isolatedImport('servicios/compiler','./compiler/world-compiler.mjs');
   let overlayMod=null,workerMod=null,touchMod=null,rangeMod=null;
   if(!phoneBoot){
-    overlayMod=await import('./render/studio-overlay-renderer.mjs?v=semantic-brush-1');await wait();abort();
-    workerMod=await import('./compiler/worker-client.mjs');await wait();abort();
+    overlayMod=await isolatedImport('render/overlay','./render/studio-overlay-renderer.mjs?v=semantic-brush-1');
+    workerMod=await isolatedImport('compiler/worker','./compiler/worker-client.mjs');
   }
-  touchMod=await import('./input/studio-placement-touch-controller.mjs');await wait();abort();
+  touchMod=await isolatedImport('input/touch','./input/studio-placement-touch-controller.mjs');
   if(!phoneBoot){
-    rangeMod=await import('./input/studio-explorer-range-selection-controller.mjs');await wait();abort();
+    rangeMod=await isolatedImport('input/range','./input/studio-explorer-range-selection-controller.mjs');
   }
   return {
     createStudioKernel:kernelMod.createStudioKernel,
