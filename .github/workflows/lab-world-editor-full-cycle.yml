@@ -19,7 +19,6 @@ jobs:
       matrix:
         include:
           - { short: "ea14e484", sha: "ea14e48426ac20aff44da009f0d615d8562cf7cd" }
-          - { short: "4d60d2e7", sha: "4d60d2e713b8fe853583309657448a983c688455" }
 
     env:
       CANDIDATE_SHA: ${{ matrix.sha }}
