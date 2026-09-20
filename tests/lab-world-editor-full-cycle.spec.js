@@ -143,9 +143,11 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
   await expect(editAssets).toBeVisible({ timeout: 10000 });
   await editAssets.tap();
 
-  const asset = studio.locator('[data-pane="assets"] [data-asset]:visible').first();
-  await expect(asset).toBeVisible({ timeout: 20000 });
-  const assetId = await asset.getAttribute('data-asset');
+  const legacyAsset = studio.locator('[data-pane="assets"] [data-asset]:visible').first();
+  const paletteAsset = studio.locator('.ks-asset-palette-item[data-asset-palette-id]:visible').first();
+  await expect.poll(async () => (await legacyAsset.count()) + (await paletteAsset.count()), { timeout: 20000 }).toBeGreaterThan(0);
+  const asset = (await paletteAsset.count()) ? paletteAsset : legacyAsset;
+  const assetId = (await asset.getAttribute('data-asset-palette-id')) || (await asset.getAttribute('data-asset'));
   expect(assetId).toBeTruthy();
   await asset.tap();
 
