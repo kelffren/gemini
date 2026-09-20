@@ -25,9 +25,27 @@ async function objectCount(studio) {
 async function kernelSnapshot(page) {
   return page.evaluate(async () => {
     try {
-      const mod = await import('./src/studio/studio-entry.mjs');
-      const session = mod.getKeloStudioSession?.();
-      const rows = session?.kernel?.document?.entities || [];
+      const resources = (performance.getEntriesByType?.('resource') || []).map(entry => String(entry?.name || ''));
+      const controllerUrl = [...resources].reverse().find(url => url.includes('/src/studio/integration/live-studio-controller.mjs'));
+      const bridgeUrl = [...resources].reverse().find(url => url.includes('/src/studio/integration/world-studio-bridge.mjs'));
+      let session = null;
+      let source = '';
+
+      if (controllerUrl) {
+        const mod = await import(controllerUrl);
+        session = mod.getKeloStudioLive?.() || null;
+        source = controllerUrl;
+      }
+      if (!session && bridgeUrl) {
+        const mod = await import(bridgeUrl);
+        session = mod.getKeloStudioLive?.() || null;
+        source = bridgeUrl;
+      }
+      if (!session) {
+        return { count: -1, ids: [], entities: [], error: 'ACTIVE_STUDIO_SESSION_NOT_FOUND', source };
+      }
+
+      const rows = session?.studio?.kernel?.document?.entities || [];
       return {
         count: rows.length,
         ids: rows.map(row => String(row.id)),
@@ -36,6 +54,7 @@ async function kernelSnapshot(page) {
           x: Number(row.transform?.x) || 0,
           y: Number(row.transform?.y) || 0,
         })),
+        source,
       };
     } catch (error) {
       return { count: -1, ids: [], entities: [], error: String(error?.message || error) };
