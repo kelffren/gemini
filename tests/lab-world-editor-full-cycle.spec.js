@@ -282,7 +282,7 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
 
   const visibleFlow = process.env.KELO_VISIBLE_FLOW === '1';
   const response = await page.goto(visibleFlow
-    ? './?guest=1&worldPlacementFunctional=1&labVisibleFlow=1'
+    ? './?guest=1&mapEditor=1&worldPlacementFunctional=1&labVisibleFlow=1'
     : './?guest=1&mapEditor=1&lab4d60d2e=2', {
     waitUntil: visibleFlow ? 'commit' : 'domcontentloaded',
     timeout: 30000,
