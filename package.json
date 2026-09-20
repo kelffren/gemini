@@ -121,7 +121,9 @@
     "audit:ai-context": "node scripts/ai-context-audit.mjs",
     "context:ask": "node scripts/ai-context-query.mjs",
     "context:history": "node scripts/ai-context-history.mjs",
-    "context:refresh": "npm run context:build && npm run audit:ai-context"
+    "context:refresh": "npm run context:build && npm run audit:ai-context && npm run audit:system-health",
+    "context:health": "node scripts/ai-context-health.mjs",
+    "audit:system-health": "node scripts/system-health-audit.mjs"
   },
   "devDependencies": {
     "@cyclonedx/cyclonedx-npm": "6.0.1",
