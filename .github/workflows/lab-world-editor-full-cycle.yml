@@ -1,4 +1,4 @@
-name: LAB Historical World Editor Boundary
+name: LAB Direct World Freeze Anchors
 
 on:
   push:
@@ -10,86 +10,55 @@ permissions:
   contents: read
 
 jobs:
-  candidate:
-    name: candidate-${{ matrix.short }}
+  anchor:
+    name: anchor-${{ matrix.short }}
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { short: "p342-7a1340bb", sha: "7a1340bb305d8c33f6f2f4dbb374bbcfd6850e39" }
-          - { short: "p684-b0c4060f", sha: "b0c4060f65b942a624497c8637c93196d1874ac6" }
-          - { short: "p1026-4f4f6a0b", sha: "4f4f6a0b4f78e8383b60d2eeb1ed08ce6e719840" }
-          - { short: "p1368-50b3d25d", sha: "50b3d25d314d2eb5d9eaa81388ec0e3b276cd3e0" }
-          - { short: "p1710-810db25c", sha: "810db25c6b5077800f56db543d359775648266ba" }
-          - { short: "p2052-ed657b3a", sha: "ed657b3afe78142d4b77bafd005ceae65f592e75" }
-          - { short: "p2394-36adefa6", sha: "36adefa63a3ff209d5dbdd42fbe88115d6ed2e2d" }
-
-    env:
-      CANDIDATE_SHA: ${{ matrix.sha }}
-      CANDIDATE_SHORT: ${{ matrix.short }}
+          - { short: "GOOD-ea14e484", sha: "ea14e48426ac20aff44da009f0d615d8562cf7cd" }
+          - { short: "BAD-4d60d2e7", sha: "4d60d2e713b8fe853583309657448a983c688455" }
 
     steps:
-      - name: Checkout diagnostic branch
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Preserve current full-cycle harness
-        run: cp tests/lab-world-editor-full-cycle.spec.js /tmp/lab-world-editor-full-cycle.spec.js
+      - name: Preserve direct probe
+        run: cp tests/lab-world-open-bisect.spec.js /tmp/lab-world-open-bisect.spec.js
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '24'
 
-      - name: Install diagnostic dependencies
-        run: npm install --no-package-lock --no-audit --no-fund
+      - name: Install Playwright runtime
+        run: npm install --no-package-lock --no-audit --no-fund && npx playwright install --with-deps chromium
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-
-      - name: Test literal visible finger flow
+      - name: Probe candidate
         shell: bash
         run: |
           set +e
-          git reset --hard "$CANDIDATE_SHA"
-          mkdir -p tests test-results candidate-evidence
-          cp /tmp/lab-world-editor-full-cycle.spec.js tests/lab-world-editor-full-cycle.spec.js
-
-          python3 -m http.server 4173 --bind 127.0.0.1 > candidate-evidence/http.log 2>&1 &
+          git reset --hard "${{ matrix.sha }}"
+          mkdir -p tests evidence
+          cp /tmp/lab-world-open-bisect.spec.js tests/lab-world-open-bisect.spec.js
+          python3 -m http.server 4173 --bind 127.0.0.1 > evidence/http.log 2>&1 &
           pid=$!
-          ready=0
-          for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then ready=1; break; fi
-            sleep 1
-          done
-          if [ "$ready" -ne 1 ]; then
-            echo "$CANDIDATE_SHA BAD server-not-ready" | tee candidate-evidence/result.txt
-            kill "$pid" 2>/dev/null || true
-            exit 0
-          fi
-
-          env -u CI KELO_VISIBLE_FLOW=1 KELO_CANDIDATE_SHA="$CANDIDATE_SHA" KELO_PAGES=http://127.0.0.1:4173/ \
-            npx playwright test tests/lab-world-editor-full-cycle.spec.js --project=chromium --workers=1 --retries=0 --reporter=list \
-            > candidate-evidence/full.log 2>&1
-          full=$?
-          cp -R test-results candidate-evidence/full-results 2>/dev/null || true
+          for i in {1..30}; do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
+          env -u CI KELO_PAGES=http://127.0.0.1:4173/ npx playwright test tests/lab-world-open-bisect.spec.js --project=chromium --workers=1 --retries=0 --reporter=list > evidence/probe.log 2>&1
+          code=$?
           kill "$pid" 2>/dev/null || true
-
-          if [ "$full" -eq 0 ]; then
-            echo "$CANDIDATE_SHA GOOD full-acceptance" | tee candidate-evidence/result.txt
+          if [ "$code" -eq 0 ]; then
+            echo "${{ matrix.sha }} GOOD direct-world-open" | tee evidence/result.txt
           else
-            echo "$CANDIDATE_SHA BAD visible-full-cycle" | tee candidate-evidence/result.txt
+            echo "${{ matrix.sha }} BAD direct-world-open" | tee evidence/result.txt
           fi
           exit 0
 
-      - name: Upload candidate evidence
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: historical-${{ matrix.short }}
-          if-no-files-found: ignore
+          name: direct-world-${{ matrix.short }}
+          path: evidence/**
           retention-days: 14
-          path: candidate-evidence/**
