@@ -1,4 +1,4 @@
-name: LAB Parallel World Editor Bisect
+name: LAB Historical World Editor Boundary
 
 on:
   push:
@@ -13,17 +13,14 @@ jobs:
   candidate:
     name: candidate-${{ matrix.short }}
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 18
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { short: "d7ca427b", sha: "d7ca427bf6779c68942fac519dbbb1a47eaa6c2d" }
-          - { short: "e1adb1aa", sha: "e1adb1aa590479f7ed88792a9181cacd015bb6e8" }
-          - { short: "eda148a3", sha: "eda148a32c2862a702aa3d1b863def1a1412d4e5" }
-          - { short: "57660dc1", sha: "57660dc1fbe2c95bad6e7dcd8bbe8769c971f712" }
-          - { short: "10a70493", sha: "10a70493602628277ede09c7170486c27a1bffd8" }
-          - { short: "c96b2f92", sha: "c96b2f929d69765221fc6048a47dbb180e5bf683" }
+          - { short: "e3287b50", sha: "e3287b50dc168123024dbed4bdd9f34690797379" }
+          - { short: "eb63246e", sha: "eb63246e67a206cd3e1e3c11e07bfbc85337378d" }
+          - { short: "d6fc0460", sha: "d6fc0460e49f1e2fcb527e4dc3e5772283014ac3" }
 
     env:
       CANDIDATE_SHA: ${{ matrix.sha }}
@@ -35,7 +32,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Preserve acceptance harness
+      - name: Preserve current full-cycle harness
         run: cp tests/lab-world-editor-full-cycle.spec.js /tmp/lab-world-editor-full-cycle.spec.js
 
       - name: Setup Node
@@ -43,19 +40,22 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Install dependencies
+      - name: Install diagnostic dependencies
         run: npm install --no-package-lock --no-audit --no-fund
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Test exact candidate
+      - name: Test exact historical candidate
         shell: bash
         run: |
           set +e
           git reset --hard "$CANDIDATE_SHA"
           mkdir -p tests test-results candidate-evidence
           cp /tmp/lab-world-editor-full-cycle.spec.js tests/lab-world-editor-full-cycle.spec.js
+
+          grep -n "property-system.js" index.html > candidate-evidence/property-boot.txt 2>&1 || true
+          grep -n "studio-launcher.js" index.html >> candidate-evidence/property-boot.txt 2>&1 || true
 
           python3 -m http.server 4173 --bind 127.0.0.1 > candidate-evidence/http.log 2>&1 &
           pid=$!
@@ -64,25 +64,32 @@ jobs:
             if curl -fsS http://127.0.0.1:4173/ >/dev/null; then ready=1; break; fi
             sleep 1
           done
-
           if [ "$ready" -ne 1 ]; then
             echo "$CANDIDATE_SHA BAD server-not-ready" | tee candidate-evidence/result.txt
             kill "$pid" 2>/dev/null || true
             exit 0
           fi
 
-          env -u CI KELO_PROBE_ONLY=1 KELO_CANDIDATE_SHA="$CANDIDATE_SHA" KELO_PAGES=http://127.0.0.1:4173/             npx playwright test tests/lab-world-editor-full-cycle.spec.js --project=chromium --workers=1 --retries=0 --reporter=list             > candidate-evidence/probe.log 2>&1
-          probe=$?
+          # First use the placement acceptance that belonged to the candidate itself.
+          if [ -f tests/world-placement-functional.spec.js ]; then
+            env -u CI KELO_PAGES=http://127.0.0.1:4173/               npx playwright test tests/world-placement-functional.spec.js --project=chromium --workers=1 --retries=0 --reporter=list               > candidate-evidence/historical-placement.log 2>&1
+            historical=$?
+          else
+            historical=2
+            echo "historical placement spec missing" > candidate-evidence/historical-placement.log
+          fi
 
-          if [ "$probe" -ne 0 ]; then
-            echo "$CANDIDATE_SHA BAD world-open" | tee candidate-evidence/result.txt
-            cp -R test-results candidate-evidence/probe-results 2>/dev/null || true
+          if [ "$historical" -ne 0 ]; then
+            echo "$CANDIDATE_SHA BAD historical-visible-placement" | tee candidate-evidence/result.txt
+            cp -R test-results candidate-evidence/historical-results 2>/dev/null || true
             kill "$pid" 2>/dev/null || true
             exit 0
           fi
 
           rm -rf test-results/*
-          env -u CI KELO_CANDIDATE_SHA="$CANDIDATE_SHA" KELO_PAGES=http://127.0.0.1:4173/             npx playwright test tests/lab-world-editor-full-cycle.spec.js --project=chromium --workers=1 --retries=0 --reporter=list             > candidate-evidence/full.log 2>&1
+
+          # Then require the user's full acceptance cycle through the historical visible launcher.
+          env -u CI KELO_VISIBLE_FLOW=1 KELO_CANDIDATE_SHA="$CANDIDATE_SHA" KELO_PAGES=http://127.0.0.1:4173/             npx playwright test tests/lab-world-editor-full-cycle.spec.js --project=chromium --workers=1 --retries=0 --reporter=list             > candidate-evidence/full.log 2>&1
           full=$?
           cp -R test-results candidate-evidence/full-results 2>/dev/null || true
           kill "$pid" 2>/dev/null || true
@@ -98,7 +105,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: candidate-${{ matrix.short }}
+          name: historical-${{ matrix.short }}
           if-no-files-found: ignore
           retention-days: 14
           path: candidate-evidence/**
