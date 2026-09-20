@@ -20,6 +20,7 @@ const semanticSource=fs.readFileSync(new URL('../src/studio/tools/semantic-brush
 const vaultSource=fs.readFileSync(new URL('../asset-vault.html',import.meta.url),'utf8');
 const launcherSource=fs.readFileSync(new URL('../src/ui/asset-library-launcher.js',import.meta.url),'utf8');
 const indexSource=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
+const postBootSource=fs.readFileSync(new URL('../src/core/post-boot-streamer.js',import.meta.url),'utf8');
 
 // Bridge orchestrates existing Studio tools. Authority writes must stay outside the bridge.
 assert.doesNotMatch(bridgeSource,/KELO_WORLD_EDIT/,'library build bridge must not write World authority directly');
@@ -53,7 +54,8 @@ assert.match(vaultSource,/kelo:build-personal-palette/,'library must hand the pe
 assert.match(vaultSource,/state\.palette\.clear\(\)/,'active-page palette must be disposable on page hibernation');
 assert.match(launcherSource,/platform\.openWorkspace\('world'\)/,'launcher must open the real World workspace directly');
 assert.match(launcherSource,/library-build-bridge\.mjs\?v=4/,'launcher must use semantic-aware build bridge');
-assert.match(indexSource,/asset-library-launcher\.js\?v=11-semantic-context/,'boot must cache-bust the semantic launcher');
+assert.doesNotMatch(indexSource,/asset-library-launcher\.js(?:\?v=[^"'\s>]+)?/,'semantic launcher must stay off first-playable index');
+assert.match(postBootSource,/asset-library-launcher\.js\?v=11-semantic-context/,'post-boot stream must cache-bust the semantic launcher');
 
 // Pure template selection contract.
 const catalogRows=[
