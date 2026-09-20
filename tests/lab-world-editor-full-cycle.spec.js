@@ -22,6 +22,27 @@ async function objectCount(studio) {
   return match ? Number(match[1]) : 0;
 }
 
+async function kernelSnapshot(page) {
+  return page.evaluate(async () => {
+    try {
+      const mod = await import('./src/studio/studio-entry.mjs');
+      const session = mod.getKeloStudioSession?.();
+      const rows = session?.kernel?.document?.entities || [];
+      return {
+        count: rows.length,
+        ids: rows.map(row => String(row.id)),
+        entities: rows.map(row => ({
+          id: String(row.id),
+          x: Number(row.transform?.x) || 0,
+          y: Number(row.transform?.y) || 0,
+        })),
+      };
+    } catch (error) {
+      return { count: -1, ids: [], entities: [], error: String(error?.message || error) };
+    }
+  });
+}
+
 async function openCreatorsWorld(page) {
   // mapEditor=1 can auto-open Creators. Reuse that visible Hub instead of
   // calling openCreatorHub a second time and creating a duplicate test artifact.
@@ -137,7 +158,9 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
     return;
   }
   const beforeObjects = await objectCount(studio);
-  const beforeIds = new Set(await studio.locator('[data-entity]').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-entity')).filter(Boolean)));
+  const beforeKernel = await kernelSnapshot(page);
+  expect(beforeKernel.count).toBeGreaterThanOrEqual(0);
+  const beforeIds = new Set(beforeKernel.ids);
 
   const editAssets = studio.locator('[data-act="edit-assets"]:visible').first();
   await expect(editAssets).toBeVisible({ timeout: 10000 });
@@ -153,31 +176,43 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
 
   const canvas = page.locator('#game-canvas');
   await expect(canvas).toBeVisible({ timeout: 10000 });
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
 
-  // Historical mobile Studio versions commit placement through the precision
-  // pad's "COLOCAR AQUÍ" control. Newer versions may commit directly on canvas.
-  // Prefer the real mobile UI when it is present so the bisect follows the
-  // interaction contract of the candidate under test.
-  const placeHere = studio.locator('[data-place-action="commit"]:visible').first();
-  if (await placeHere.count()) {
-    await expect(placeHere).toBeVisible({ timeout: 10000 });
-    await placeHere.tap();
-  } else {
-    const box = await canvas.boundingBox();
-    expect(box).not.toBeNull();
-    await canvas.tap({
-      position: {
-        x: Math.max(50, Math.min(box.width - 50, box.width * .52)),
-        y: Math.max(140, Math.min(box.height - 170, box.height * .46)),
-      },
-    });
+  // Canonical historical World placement is a map tap/pointer cycle. This path
+  // goes through live-studio-controller guarded(...) so the Kernel AND Studio UI
+  // refresh together. The precision pad commits directly and can leave the shell
+  // stale, so it is only a fallback if the map tap did not mutate the Kernel.
+  const tap = {
+    x: Math.max(50, Math.min(box.width - 50, box.width * .52)),
+    y: Math.max(140, Math.min(box.height - 170, box.height * .46)),
+  };
+  await canvas.tap({ position: tap });
+
+  let placed = false;
+  try {
+    await expect.poll(async () => (await kernelSnapshot(page)).count, { timeout: 7000 }).toBeGreaterThan(beforeKernel.count);
+    placed = true;
+  } catch {}
+
+  if (!placed) {
+    const placeHere = studio.locator('[data-place-action="commit"]:visible').first();
+    if (await placeHere.count()) {
+      await placeHere.tap();
+      await expect.poll(async () => (await kernelSnapshot(page)).count, { timeout: 7000 }).toBeGreaterThan(beforeKernel.count);
+      placed = true;
+    }
   }
+  expect(placed).toBe(true);
 
-  await expect.poll(async () => objectCount(studio), { timeout: 20000 }).toBeGreaterThan(beforeObjects);
-  const afterPlaceObjects = await objectCount(studio);
-  const afterIds = await studio.locator('[data-entity]').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-entity')).filter(Boolean));
-  const entityId = afterIds.find(id => !beforeIds.has(id));
+  const afterKernel = await kernelSnapshot(page);
+  const entityId = afterKernel.ids.find(id => !beforeIds.has(id));
   expect(entityId).toBeTruthy();
+
+  // After canonical canvas placement the shell should refresh. Give historical
+  // builds a short settling window, but use the Kernel as the mutation truth.
+  await expect.poll(async () => objectCount(studio), { timeout: 10000 }).toBeGreaterThanOrEqual(beforeObjects + 1);
+  const afterPlaceObjects = afterKernel.count;
 
   const placedRow = studio.locator(`[data-entity="${entityId}"]`);
   await expect(placedRow).toHaveCount(1, { timeout: 10000 });
@@ -193,7 +228,10 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
     el.value = String(value);
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }, newX);
-  await page.waitForTimeout(500);
+  await expect.poll(async () => {
+    const snap = await kernelSnapshot(page);
+    return snap.entities.find(row => row.id === ${entityId})?.x;
+  }, { timeout: 10000 }).toBe(newX);
 
   const close = studio.locator('[data-act="close"]:visible').first();
   await expect(close).toBeVisible({ timeout: 10000 });
@@ -206,7 +244,7 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
 
   studio = await openCreatorsWorld(page);
   await expect(studio).not.toHaveAttribute('data-kelo-world-loading', '1', { timeout: 40000 });
-  await expect.poll(async () => objectCount(studio), { timeout: 20000 }).toBeGreaterThanOrEqual(afterPlaceObjects);
+  await expect.poll(async () => (await kernelSnapshot(page)).count, { timeout: 20000 }).toBeGreaterThanOrEqual(afterPlaceObjects);
 
   const persistedRow = studio.locator(`[data-entity="${entityId}"]`);
   await expect(persistedRow).toHaveCount(1, { timeout: 15000 });
@@ -215,6 +253,9 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
 
   const persistedX = Number(await studio.locator('[data-prop="x"]').first().inputValue());
   expect(persistedX).toBe(newX);
+  const reopenedKernel = await kernelSnapshot(page);
+  expect(reopenedKernel.ids).toContain(entityId);
+  expect(reopenedKernel.entities.find(row => row.id === entityId)?.x).toBe(newX);
 
   const evidence = {
     commitUnderTest: '4d60d2e713b8fe853583309657448a983c688455',
