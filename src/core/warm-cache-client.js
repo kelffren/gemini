@@ -58,7 +58,7 @@
     return 'fast';
   }
   var sent=Object.create(null);
-  function post(urls){
+  function traffic(){return window.KELO_TRAFFIC_CONTROLLER||null;}\n  function post(urls){
     urls=urls.filter(function(url){if(sent[url])return false;sent[url]=1;return true;});
     if(!urls.length)return;
     navigator.serviceWorker.ready.then(function(reg){
