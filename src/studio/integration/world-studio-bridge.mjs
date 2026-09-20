@@ -20,6 +20,7 @@ const incomingBuild=bridgeUrl.searchParams.get('v')||'';
 const controllerBuild=(incomingBuild.endsWith('-retry')||incomingBuild.startsWith('world-ios-'))?incomingBuild:WORLD_STUDIO_BRIDGE_BUILD;
 const CONTROLLER=`./live-studio-controller.mjs?v=${encodeURIComponent(controllerBuild)}`;
 const BUG_ID='BUG-0003';
+const CONTROLLER_IMPORT_TIMEOUT_MS=12000;
 let controllerMod=null;
 
 function runtimeSnapshot(root=globalThis){
@@ -81,7 +82,21 @@ async function loadController(root,observer=null){
   await yieldStudioBoot(root);
   if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
   observer?.mark('CONTROLLER_IMPORT_START',runtimeSnapshot(root));
-  controllerMod=await import(CONTROLLER);
+  let timeoutId=null;
+  try{
+    controllerMod=await Promise.race([
+      import(CONTROLLER),
+      new Promise((_,reject)=>{
+        const wait=typeof root?.setTimeout==='function'?root.setTimeout.bind(root):setTimeout;
+        timeoutId=wait(()=>reject(new Error('WORLD_EDITOR_CONTROLLER_IMPORT_TIMEOUT')),CONTROLLER_IMPORT_TIMEOUT_MS);
+      })
+    ]);
+  }finally{
+    if(timeoutId!=null){
+      const cancel=typeof root?.clearTimeout==='function'?root.clearTimeout.bind(root):clearTimeout;
+      cancel(timeoutId);
+    }
+  }
   observer?.mark('CONTROLLER_IMPORT_DONE',runtimeSnapshot(root));
   if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
   setWorldLaunchStatus(root,'Montando editor…');
