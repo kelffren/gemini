@@ -68,6 +68,10 @@ async function kernelSnapshot(page) {
         ids: rows.map(row => String(row.id)),
         entities: rows.map(row => ({
           id: String(row.id),
+          prefabId: row.prefabId == null ? null : String(row.prefabId),
+          authorityPlacementId: row.source?.authorityPlacementId == null
+            ? (row.source?.placementId == null ? null : String(row.source.placementId))
+            : String(row.source.authorityPlacementId),
           x: Number(row.transform?.x) || 0,
           y: Number(row.transform?.y) || 0,
         })),
@@ -375,6 +379,10 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
   const afterKernel = await kernelSnapshot(page);
   const entityId = afterKernel.ids.find(id => !beforeIds.has(id));
   expect(entityId).toBeTruthy();
+  const placedEntity = afterKernel.entities.find(row => row.id === entityId);
+  expect(placedEntity).toBeTruthy();
+  const stablePlacementId = placedEntity.authorityPlacementId || null;
+  const placedPrefabId = placedEntity.prefabId || null;
 
   // After canonical canvas placement the shell should refresh. Give historical
   // builds a short settling window, but use the Kernel as the mutation truth.
@@ -436,23 +444,35 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
   await expect(persistedExplorerTab).toBeVisible({ timeout: 10000 });
   await persistedExplorerTab.tap();
 
-  const persistedRows = studio.locator(`[data-entity="${entityId}"]`);
+  const reopenedKernel = await kernelSnapshot(page);
+  const persistedEntity =
+    (stablePlacementId
+      ? reopenedKernel.entities.find(row => row.authorityPlacementId === stablePlacementId)
+      : null)
+    || reopenedKernel.entities.find(row =>
+      (!placedPrefabId || row.prefabId === placedPrefabId)
+      && row.x === newX
+    );
+  expect(persistedEntity).toBeTruthy();
+  expect(persistedEntity.x).toBe(newX);
+
+  const persistedRows = studio.locator(`[data-entity="${persistedEntity.id}"]`);
   await expect.poll(async () => persistedRows.count(), { timeout: 15000 }).toBeGreaterThan(0);
-  const persistedRow = studio.locator(`[data-entity="${entityId}"]:visible`).first();
+  const persistedRow = studio.locator(`[data-entity="${persistedEntity.id}"]:visible`).first();
   await expect(persistedRow).toBeVisible({ timeout: 15000 });
   await persistedRow.tap();
   await page.waitForTimeout(300);
 
   const persistedX = Number(await studio.locator('[data-prop="x"]').first().inputValue());
   expect(persistedX).toBe(newX);
-  const reopenedKernel = await kernelSnapshot(page);
-  expect(reopenedKernel.ids).toContain(entityId);
-  expect(reopenedKernel.entities.find(row => row.id === entityId)?.x).toBe(newX);
 
   const evidence = {
-    commitUnderTest: '4d60d2e713b8fe853583309657448a983c688455',
+    commitUnderTest: process.env.KELO_CANDIDATE_SHA || null,
     assetId,
     entityId,
+    reopenedEntityId: persistedEntity.id,
+    stablePlacementId,
+    placedPrefabId,
     beforeObjects,
     afterPlaceObjects,
     oldX,
