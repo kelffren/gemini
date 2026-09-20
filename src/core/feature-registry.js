@@ -49,10 +49,10 @@ const raw={
     {src:'src/abilities/stone-system.js?v=20260916-pvp-first-use-1',name:'piedras PvP'},
     {src:'src/abilities/kelo-ability-boot.js?v=20260916-pvp-first-use-1',name:'runtime habilidades PvP'},
     {src:'src/systems/guardian-pvp-host.js?v=4-worker-prune',name:'Guardian PvP host temporal'},
-    {src:'engine-net.js?v=20260916-pvp-first-use-1',name:'online PvP'},
+    {src:'engine-net.js?v=20260919-pvp-ack-rtt-1',name:'online PvP'},
     {src:'src/systems/guardian-pvp-net-adapter.js?v=2-takeover',name:'Guardian PvP network adapter'},
     {src:'src/systems/pvp-world.js?v=20260916-pvp-first-use-1',name:'mundo PvP'},
-    {src:'src/systems/pvp-auto-reducer.js?v=3',name:'protección automática de calidad PvP'},
+    {src:'src/systems/pvp-auto-reducer.js?v=4',name:'protección automática de calidad PvP'},
     {src:'src/ui/guardian-pvp-ui.js?v=2-mobile-safe',name:'control móvil Guardian PvP Lab'},
     {src:'src/systems/pvp-combat-runtime-loader.js?v=20260916-pvp-first-use-1',name:'lifecycle combate PvP'}
   ]},
