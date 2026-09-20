@@ -42,6 +42,23 @@ async function kernelSnapshot(page) {
         source = bridgeUrl;
       }
       if (!session) {
+        // Historical snapshots may not expose the already-loaded ESM URL through
+        // PerformanceResourceTiming. Import the canonical controller path directly;
+        // ESM module caching returns the active singleton rather than creating Studio twice.
+        try {
+          const mod = await import('./src/studio/integration/live-studio-controller.mjs');
+          session = mod.getKeloStudioLive?.() || null;
+          source = source || 'canonical-live-studio-controller';
+        } catch {}
+      }
+      if (!session) {
+        try {
+          const mod = await import('./src/studio/integration/world-studio-bridge.mjs');
+          session = mod.getKeloStudioLive?.() || null;
+          source = source || 'canonical-world-studio-bridge';
+        } catch {}
+      }
+      if (!session) {
         return { count: -1, ids: [], entities: [], error: 'ACTIVE_STUDIO_SESSION_NOT_FOUND', source };
       }
 
