@@ -30,6 +30,8 @@ jobs:
         run: node scripts/ai-context-compiler.mjs
       - name: Audit AI context
         run: node scripts/ai-context-audit.mjs
+      - name: Audit system health memory
+        run: node scripts/system-health-audit.mjs
       - name: Ensure generated maps are committed
         run: |
           git diff --exit-code -- docs/generated/AI_CODE_MAP.json docs/generated/AI_CODE_MAP.md || {
