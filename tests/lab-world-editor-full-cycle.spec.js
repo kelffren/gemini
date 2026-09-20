@@ -67,13 +67,17 @@ async function openCreatorsWorld(page) {
     // Test exactly what a player does with a finger. If the historical account
     // gate is visible, enter through the real guest button before touching menu.
     const accountDialog = page.getByRole('dialog', { name: /Cuenta de Kelo World/i });
-    if (await accountDialog.count()) {
+    const enterGuestIfNeeded = async () => {
       const guest = accountDialog.getByRole('button', { name: /Jugar como invitado/i });
+      await guest.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
       if (await guest.isVisible().catch(() => false)) {
         await guest.tap();
         await expect(accountDialog).toBeHidden({ timeout: 30000 });
+        return true;
       }
-    }
+      return false;
+    };
+    await enterGuestIfNeeded();
 
     // No prerequisite runtime globals are accepted as a proxy for a usable UI.
     const existingHub = page.locator('#kelo-creators-hub:visible').last();
@@ -85,7 +89,10 @@ async function openCreatorsWorld(page) {
 
       const panel = page.locator('#lx-menu-panel');
       const isOpen = await panel.evaluate(el => el.classList.contains('open')).catch(() => false);
-      if (!isOpen) await menu.tap();
+      if (!isOpen) {
+        await enterGuestIfNeeded();
+        await menu.tap();
+      }
       await expect(panel).toHaveClass(/open/, { timeout: 15000 });
 
       const creators = page.locator('#lx-create-studio');
