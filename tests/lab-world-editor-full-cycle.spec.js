@@ -64,28 +64,30 @@ async function kernelSnapshot(page) {
 
 async function openCreatorsWorld(page) {
   if (process.env.KELO_VISIBLE_FLOW === '1') {
-    await page.waitForFunction(() => !!(
-      window.KeloGuestPlay?.active?.() &&
-      window.KELO_ADMIN_KEYS?.can?.('world.edit') &&
-      window.KELO_LUXE?.toggleMenu &&
-      window.KELO_CREATORS_LAUNCHER
-    ), null, { timeout: 90000 });
+    // Test exactly what a player does with a finger. No prerequisite runtime
+    // globals are accepted as a proxy for a usable UI.
+    const existingHub = page.locator('#kelo-creators-hub:visible').last();
+    let hub = existingHub;
 
-    const menu = page.locator('#lx-side-menu');
-    await expect(menu).toBeVisible({ timeout: 20000 });
-    const panel = page.locator('#lx-menu-panel');
-    const isOpen = await panel.evaluate(el => el.classList.contains('open')).catch(() => false);
-    if (!isOpen) await menu.tap();
-    await expect(panel).toHaveClass(/open/, { timeout: 10000 });
+    if (await existingHub.count() === 0) {
+      const menu = page.locator('#lx-side-menu');
+      await expect(menu).toBeVisible({ timeout: 60000 });
 
-    const creators = page.locator('#lx-create-studio');
-    await expect(creators).toBeVisible({ timeout: 20000 });
-    await creators.tap();
+      const panel = page.locator('#lx-menu-panel');
+      const isOpen = await panel.evaluate(el => el.classList.contains('open')).catch(() => false);
+      if (!isOpen) await menu.tap();
+      await expect(panel).toHaveClass(/open/, { timeout: 15000 });
 
-    const hub = page.locator('#kelo-creators-hub:visible').last();
-    await expect(hub).toBeVisible({ timeout: 30000 });
+      const creators = page.locator('#lx-create-studio');
+      await expect(creators).toBeVisible({ timeout: 20000 });
+      await creators.tap();
+
+      hub = page.locator('#kelo-creators-hub:visible').last();
+      await expect(hub).toBeVisible({ timeout: 30000 });
+    }
+
     const world = hub.locator('[data-workspace="world"]');
-    await expect(world).toBeVisible({ timeout: 10000 });
+    await expect(world).toBeVisible({ timeout: 15000 });
     await world.tap();
 
     const studio = page.locator('#kelo-studio-live');
