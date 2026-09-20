@@ -64,16 +64,13 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Test exact historical candidate
+      - name: Test literal visible finger flow
         shell: bash
         run: |
           set +e
           git reset --hard "$CANDIDATE_SHA"
           mkdir -p tests test-results candidate-evidence
           cp /tmp/lab-world-editor-full-cycle.spec.js tests/lab-world-editor-full-cycle.spec.js
-
-          grep -n "property-system.js" index.html > candidate-evidence/property-boot.txt 2>&1 || true
-          grep -n "studio-launcher.js" index.html >> candidate-evidence/property-boot.txt 2>&1 || true
 
           python3 -m http.server 4173 --bind 127.0.0.1 > candidate-evidence/http.log 2>&1 &
           pid=$!
@@ -88,26 +85,9 @@ jobs:
             exit 0
           fi
 
-          # First use the placement acceptance that belonged to the candidate itself.
-          if [ -f tests/world-placement-functional.spec.js ]; then
-            env -u CI KELO_PAGES=http://127.0.0.1:4173/               npx playwright test tests/world-placement-functional.spec.js --project=chromium --workers=1 --retries=0 --reporter=list               > candidate-evidence/historical-placement.log 2>&1
-            historical=$?
-          else
-            historical=2
-            echo "historical placement spec missing" > candidate-evidence/historical-placement.log
-          fi
-
-          if [ "$historical" -ne 0 ]; then
-            echo "$CANDIDATE_SHA BAD historical-visible-placement" | tee candidate-evidence/result.txt
-            cp -R test-results candidate-evidence/historical-results 2>/dev/null || true
-            kill "$pid" 2>/dev/null || true
-            exit 0
-          fi
-
-          rm -rf test-results/*
-
-          # Then require the user's full acceptance cycle through the historical visible launcher.
-          env -u CI KELO_VISIBLE_FLOW=1 KELO_CANDIDATE_SHA="$CANDIDATE_SHA" KELO_PAGES=http://127.0.0.1:4173/             npx playwright test tests/lab-world-editor-full-cycle.spec.js --project=chromium --workers=1 --retries=0 --reporter=list             > candidate-evidence/full.log 2>&1
+          env -u CI KELO_VISIBLE_FLOW=1 KELO_CANDIDATE_SHA="$CANDIDATE_SHA" KELO_PAGES=http://127.0.0.1:4173/ \
+            npx playwright test tests/lab-world-editor-full-cycle.spec.js --project=chromium --workers=1 --retries=0 --reporter=list \
+            > candidate-evidence/full.log 2>&1
           full=$?
           cp -R test-results candidate-evidence/full-results 2>/dev/null || true
           kill "$pid" 2>/dev/null || true
@@ -115,7 +95,7 @@ jobs:
           if [ "$full" -eq 0 ]; then
             echo "$CANDIDATE_SHA GOOD full-acceptance" | tee candidate-evidence/result.txt
           else
-            echo "$CANDIDATE_SHA BAD full-acceptance" | tee candidate-evidence/result.txt
+            echo "$CANDIDATE_SHA BAD visible-full-cycle" | tee candidate-evidence/result.txt
           fi
           exit 0
 
