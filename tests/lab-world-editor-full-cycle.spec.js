@@ -383,9 +383,16 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
 
   const placedRows = studio.locator(`[data-entity="${entityId}"]`);
   await expect.poll(async () => placedRows.count(), { timeout: 10000 }).toBeGreaterThan(0);
+  if (await studio.locator(`[data-entity="${entityId}"]:visible`).count() === 0) {
+    const editForExplorer = studio.locator('[data-act="edit-assets"]:visible').first();
+    if (await editForExplorer.count()) await editForExplorer.tap();
+    const explorerTab = studio.locator('[data-tab="explorer"]:visible').first();
+    await expect(explorerTab).toBeVisible({ timeout: 10000 });
+    await explorerTab.tap();
+  }
   const placedRow = studio.locator(`[data-entity="${entityId}"]:visible`).first();
   await expect(placedRow).toBeVisible({ timeout: 10000 });
-  await placedRow.click({ force: true });
+  await placedRow.tap();
   await page.waitForTimeout(300);
 
   const xInput = studio.locator('[data-prop="x"]').first();
@@ -423,9 +430,16 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
 
   const persistedRows = studio.locator(`[data-entity="${entityId}"]`);
   await expect.poll(async () => persistedRows.count(), { timeout: 15000 }).toBeGreaterThan(0);
+  if (await studio.locator(`[data-entity="${entityId}"]:visible`).count() === 0) {
+    const editForExplorer = studio.locator('[data-act="edit-assets"]:visible').first();
+    if (await editForExplorer.count()) await editForExplorer.tap();
+    const explorerTab = studio.locator('[data-tab="explorer"]:visible').first();
+    await expect(explorerTab).toBeVisible({ timeout: 10000 });
+    await explorerTab.tap();
+  }
   const persistedRow = studio.locator(`[data-entity="${entityId}"]:visible`).first();
   await expect(persistedRow).toBeVisible({ timeout: 15000 });
-  await persistedRow.click({ force: true });
+  await persistedRow.tap();
   await page.waitForTimeout(300);
 
   const persistedX = Number(await studio.locator('[data-prop="x"]').first().inputValue());
