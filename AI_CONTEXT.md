@@ -67,7 +67,7 @@ Canonical deeper docs:
 
 ## Machine context layer
 
-For large/fresh sessions, generate the machine-readable map with `npm run context:build` and inspect `docs/generated/AI_CODE_MAP.json`. It indexes KELO-INDEX metadata, owner symbols, imports/exports, event names, and QA/audit commands without loading the whole repository into model context. Validate it with `npm run audit:ai-context`. For an instant task route, run `npm run context:ask -- "editor scene placement"`; it ranks likely files and shows risk, direct dependents, and suggested QA.
+For large/fresh sessions, generate the machine-readable map with `npm run context:build` and inspect `docs/generated/AI_CODE_MAP.json`. It indexes KELO-INDEX metadata, owner symbols, imports/exports, event names, and QA/audit commands without loading the whole repository into model context. Validate it with `npm run audit:ai-context`. For an instant task route, run `npm run context:ask -- "editor scene placement"`; it ranks likely files and shows risk, direct dependents, and suggested QA. For regression/history work use `npm run context:history -- "world editor freeze"`; it finds likely target files first, then surfaces recent commits and fix/regression signals. `npm run context:refresh` rebuilds and audits the context layer in one command. CI rejects stale generated maps.
 
 The generated map is a locator, never runtime truth. Confirm LIVE reachability through `index.html` / `KELO_MODULE_LOADER` before changing behavior.
 
