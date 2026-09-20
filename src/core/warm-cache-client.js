@@ -58,7 +58,8 @@
     return 'fast';
   }
   var sent=Object.create(null);
-  function traffic(){return window.KELO_TRAFFIC_CONTROLLER||null;}\n  function post(urls){
+  function traffic(){return window.KELO_TRAFFIC_CONTROLLER||null;}
+  function post(urls){
     urls=urls.filter(function(url){if(sent[url])return false;sent[url]=1;return true;});
     if(!urls.length)return;
     navigator.serviceWorker.ready.then(function(reg){
@@ -68,8 +69,12 @@
   }
   function warmBatch(list,index,size,delay){
     if(document.hidden)return;
-    var batch=list.slice(index,index+size);if(!batch.length)return;post(batch);
-    setTimeout(function(){warmBatch(list,index+size,size,delay);},delay);
+    var tc=traffic(),snap=tc&&tc.snapshot?tc.snapshot():null;
+    if(snap&&!snap.backgroundAllowed){setTimeout(function(){warmBatch(list,index,size,delay);},Math.max(900,delay));return;}
+    var dynamicSize=snap?Math.max(1,Math.min(size,snap.concurrency||1)):size;
+    var batch=list.slice(index,index+dynamicSize);if(!batch.length)return;
+    if(tc&&tc.run)tc.run(function(){post(batch);return Promise.resolve();},{priority:4});else post(batch);
+    setTimeout(function(){warmBatch(list,index+dynamicSize,size,delay);},delay);
   }
   function warm(){
     var p=profile();
