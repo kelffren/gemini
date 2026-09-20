@@ -94,6 +94,26 @@ async function openCreatorsWorld(page) {
     };
     await enterGuestIfNeeded();
 
+    // Historical ea14 can have its local developer Admin Key shadowed by the old
+    // remote authority. mapEditor=1 explicitly enables the snapshot's own local-root
+    // bootstrap, so use that public API only when world.edit is missing.
+    await page.evaluate(async () => {
+      const keys = window.KELO_ADMIN_KEYS;
+      if (!keys?.can?.('world.edit', keys.playerId?.()) && new URLSearchParams(location.search).get('mapEditor') === '1') {
+        keys.installRemoteAdapter?.(null);
+        const ownerId = keys.playerId?.() || 'local_pioneer';
+        await keys.request?.('admin-key:bootstrap-local-root', {
+          actorId: ownerId,
+          ownerId,
+          developer: true,
+        });
+        keys.syncInventory?.();
+      }
+    });
+    const worldEditAllowed = await page.evaluate(() => !!window.KELO_ADMIN_KEYS?.can?.('world.edit', window.KELO_ADMIN_KEYS?.playerId?.()));
+    expect(worldEditAllowed).toBe(true);
+    console.log('[LAB_STEP] WORLD_EDIT_PERMISSION_OK');
+
     // No prerequisite runtime globals are accepted as a proxy for a usable UI.
     const existingHub = page.locator('#kelo-creators-hub:visible').last();
     let hub = existingHub;
