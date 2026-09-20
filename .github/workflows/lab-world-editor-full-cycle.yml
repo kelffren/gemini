@@ -18,9 +18,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { short: "6e0c5404", sha: "6e0c540434f3cd70a16ac4342e97b5072f607274" }
           - { short: "ea14e484", sha: "ea14e48426ac20aff44da009f0d615d8562cf7cd" }
-          - { short: "c13cceaf", sha: "c13cceafecd4edc9144a99a108eb2851f88a7541" }
+          - { short: "4d60d2e7", sha: "4d60d2e713b8fe853583309657448a983c688455" }
 
     env:
       CANDIDATE_SHA: ${{ matrix.sha }}
