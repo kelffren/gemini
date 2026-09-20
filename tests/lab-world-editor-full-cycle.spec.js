@@ -121,30 +121,57 @@ async function openCreatorsWorld(page) {
     const permissionState = await page.evaluate(async () => {
       const keys = window.KELO_ADMIN_KEYS;
       if (!keys) return { allowedForCurrentActor: false, actorId: null, seen: [] };
+
+      // Lab-only: use the snapshot's own local developer authority so historical
+      // Supabase/account scope timing cannot masquerade as a World Editor regression.
       keys.installRemoteAdapter?.(null);
+      keys.installScopeProvider?.(null);
 
       const seen = [];
-      if (new URLSearchParams(location.search).get('mapEditor') === '1') {
-        for (let i = 0; i < 8; i++) {
-          const actorId = String(keys.playerId?.() || window.localPlayer?.id || 'local_pioneer');
-          if (!seen.includes(actorId)) seen.push(actorId);
-          if (!keys.can?.('world.edit', actorId)) {
+      const mapEditor = new URLSearchParams(location.search).get('mapEditor') === '1';
+      let stableActor = '';
+      let stableTicks = 0;
+      let actorId = String(keys.playerId?.() || window.localPlayer?.id || 'local_pioneer');
+
+      for (let i = 0; i < 50; i++) {
+        actorId = String(keys.playerId?.() || window.localPlayer?.id || 'local_pioneer');
+        if (!seen.includes(actorId)) seen.push(actorId);
+
+        if (mapEditor && !keys.can?.('world.edit', actorId)) {
+          try {
             await keys.request?.('admin-key:bootstrap-local-root', {
               actorId,
               ownerId: actorId,
               developer: true,
             });
-          }
+          } catch {}
           keys.syncInventory?.();
-          await new Promise(resolve => setTimeout(resolve, 120));
         }
+
+        const allowed = !!keys.can?.('world.edit', actorId);
+        if (allowed && actorId === stableActor) stableTicks++;
+        else {
+          stableActor = actorId;
+          stableTicks = allowed ? 1 : 0;
+        }
+
+        if (allowed && stableTicks >= 5) break;
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      const actorId = String(keys.playerId?.() || window.localPlayer?.id || 'local_pioneer');
-      if (!keys.can?.('world.edit', actorId) && new URLSearchParams(location.search).get('mapEditor') === '1') {
-        await keys.request?.('admin-key:bootstrap-local-root', { actorId, ownerId: actorId, developer: true });
+      actorId = String(keys.playerId?.() || window.localPlayer?.id || 'local_pioneer');
+      if (mapEditor && !keys.can?.('world.edit', actorId)) {
+        try {
+          await keys.request?.('admin-key:bootstrap-local-root', {
+            actorId,
+            ownerId: actorId,
+            developer: true,
+          });
+        } catch {}
         keys.syncInventory?.();
+        await new Promise(resolve => setTimeout(resolve, 250));
       }
+
       window.__KELO_LAB_EDITOR_ACTOR = actorId;
       return {
         actorId,
