@@ -196,7 +196,7 @@ async function walkRight(page, ms = 2500) {
 }
 
 test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen', async ({ page }) => {
-  test.setTimeout(process.env.KELO_PROBE_ONLY === '1' ? 120000 : 240000);
+  test.setTimeout(process.env.KELO_PROBE_ONLY === '1' ? 90000 : 140000);
   fs.mkdirSync('test-results', { recursive: true });
 
   const pageErrors = [];
@@ -213,7 +213,9 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
   });
   expect(response && response.status()).toBeLessThan(400);
 
+  console.log('[LAB_STEP] OPEN_WORLD_START');
   let studio = await openCreatorsWorld(page);
+  console.log('[LAB_STEP] OPEN_WORLD_OK');
   if (process.env.KELO_PROBE_ONLY === '1') {
     fs.writeFileSync('test-results/lab-world-editor-open-probe.json', JSON.stringify({
       commitUnderTest: process.env.KELO_CANDIDATE_SHA || null,
@@ -227,6 +229,7 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
     expect(consoleErrors.filter(row => /CREATOR_WORLD_STUDIO_MOUNT_FAILED|WORLD_EDIT_NOT_READY|WORLD_EDITOR_OPEN_TIMEOUT/.test(row))).toEqual([]);
     return;
   }
+  console.log('[LAB_STEP] ASSET_PHASE_START');
   const beforeObjects = await objectCount(studio);
   const beforeKernel = await kernelSnapshot(page);
   expect(beforeKernel.count).toBeGreaterThanOrEqual(0);
@@ -274,6 +277,7 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
     }
   }
   expect(placed).toBe(true);
+  console.log('[LAB_STEP] PLACE_OK');
 
   const afterKernel = await kernelSnapshot(page);
   const entityId = afterKernel.ids.find(id => !beforeIds.has(id));
@@ -298,21 +302,27 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
     el.value = String(value);
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }, newX);
+  console.log('[LAB_STEP] MOVE_START');
   await expect.poll(async () => {
     const snap = await kernelSnapshot(page);
     return snap.entities.find(row => row.id === entityId)?.x;
   }, { timeout: 10000 }).toBe(newX);
 
+  console.log('[LAB_STEP] MOVE_OK');
   const close = studio.locator('[data-act="close"]:visible').first();
   await expect(close).toBeVisible({ timeout: 10000 });
   await close.tap();
   await expect(page.locator('#kelo-studio-live')).toHaveCount(0, { timeout: 20000 });
 
+  console.log('[LAB_STEP] CLOSE_OK');
   const walk = await walkRight(page);
   expect(walk.moved).toBeGreaterThan(4);
   expect(walk.after.touchActive).toBe(false);
 
+  console.log('[LAB_STEP] WALK_OK');
+  console.log('[LAB_STEP] REOPEN_START');
   studio = await openCreatorsWorld(page);
+  console.log('[LAB_STEP] REOPEN_OK');
   await expect(studio).not.toHaveAttribute('data-kelo-world-loading', '1', { timeout: 40000 });
   await expect.poll(async () => (await kernelSnapshot(page)).count, { timeout: 20000 }).toBeGreaterThanOrEqual(afterPlaceObjects);
 
