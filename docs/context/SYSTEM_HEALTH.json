@@ -1,0 +1,45 @@
+{
+  "schema": "kelo-system-health-v1",
+  "systems": {
+    "studio": {
+      "aliases": ["editor", "world editor", "creators", "placement", "paint"],
+      "ownerHints": ["Studio", "KELO_WORLD_EDIT"],
+      "status": "unknown",
+      "lastKnownGood": null,
+      "knownBad": [],
+      "openRegressions": [],
+      "qa": ["audit:studio", "audit:studio:placement-touch", "audit:studio:paint-copies"],
+      "notes": "Set lastKnownGood only after the required mobile/runtime gate is actually verified."
+    },
+    "boot": {
+      "aliases": ["loading", "4g", "5g", "preload", "startup", "freeze"],
+      "ownerHints": ["KELO_MODULE_LOADER", "KELO_PERF", "KELO_PERFORMANCE_GOVERNOR"],
+      "status": "unknown",
+      "lastKnownGood": null,
+      "knownBad": [],
+      "openRegressions": [],
+      "qa": ["audit:performance", "audit:evergreen-runtime"],
+      "notes": "Do not infer health from a successful build alone."
+    },
+    "pvp": {
+      "aliases": ["arena", "combat", "hitstop", "dash", "latency"],
+      "ownerHints": ["PVP", "Arena"],
+      "status": "unknown",
+      "lastKnownGood": null,
+      "knownBad": [],
+      "openRegressions": [],
+      "qa": ["audit:arena", "audit:pvp-facing", "audit:pvp-auto-reducer"],
+      "notes": "Last-known-good requires gameplay/runtime evidence."
+    },
+    "assets": {
+      "aliases": ["asset library", "atlas", "tileset", "scene", "prefab"],
+      "ownerHints": ["KELO_ATLAS_CONTRACT", "KELO_PROPERTY_CATALOG", "KELO_PERSONAL_SCENES"],
+      "status": "unknown",
+      "lastKnownGood": null,
+      "knownBad": [],
+      "openRegressions": [],
+      "qa": ["audit:library-build", "audit:universal-content"],
+      "notes": "Scene import and asset ingestion can have separate health evidence."
+    }
+  }
+}
