@@ -92,7 +92,7 @@ export async function preloadPhoneStudioRuntime(root=globalThis,{load=null,yield
   let loaded=0;
   for(const specifier of modules){
     if(root?.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
-    await importer(specifier);
+    await withTimeout(root,Promise.resolve().then(()=>importer(specifier)),Math.min(8000,studioOpenBudget(root)),`WORLD_EDITOR_PRELOAD_TIMEOUT_${loaded+1}`);
     loaded++;
     paintBootProgress(root,loaded,modules.length);
     if(loaded<modules.length)await release();
