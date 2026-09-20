@@ -64,8 +64,18 @@ async function kernelSnapshot(page) {
 
 async function openCreatorsWorld(page) {
   if (process.env.KELO_VISIBLE_FLOW === '1') {
-    // Test exactly what a player does with a finger. No prerequisite runtime
-    // globals are accepted as a proxy for a usable UI.
+    // Test exactly what a player does with a finger. If the historical account
+    // gate is visible, enter through the real guest button before touching menu.
+    const accountDialog = page.getByRole('dialog', { name: /Cuenta de Kelo World/i });
+    if (await accountDialog.count()) {
+      const guest = accountDialog.getByRole('button', { name: /Jugar como invitado/i });
+      if (await guest.isVisible().catch(() => false)) {
+        await guest.tap();
+        await expect(accountDialog).toBeHidden({ timeout: 30000 });
+      }
+    }
+
+    // No prerequisite runtime globals are accepted as a proxy for a usable UI.
     const existingHub = page.locator('#kelo-creators-hub:visible').last();
     let hub = existingHub;
 
