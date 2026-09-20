@@ -86,7 +86,9 @@ async function openCreatorsWorld(page) {
       await expect(hub).toBeVisible({ timeout: 30000 });
     }
 
-    const world = hub.locator('[data-workspace="world"]');
+    const keyedWorld = hub.locator('[data-workspace="world"]');
+    const namedWorld = hub.getByRole('button', { name: /Abrir World/i }).first();
+    const world = (await keyedWorld.count()) ? keyedWorld : namedWorld;
     await expect(world).toBeVisible({ timeout: 15000 });
     await world.tap();
 
@@ -119,7 +121,9 @@ async function openCreatorsWorld(page) {
     window.KELO_ADMIN_KEYS?.can?.('world.edit')
   ), null, { timeout: 15000 });
 
-  const world = hub.locator('[data-workspace="world"]');
+  const keyedWorld = hub.locator('[data-workspace="world"]');
+  const namedWorld = hub.getByRole('button', { name: /Abrir World/i }).first();
+  const world = (await keyedWorld.count()) ? keyedWorld : namedWorld;
   await expect(world).toBeVisible({ timeout: 10000 });
   await world.tap();
 
