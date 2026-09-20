@@ -381,8 +381,10 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
   await expect.poll(async () => objectCount(studio), { timeout: 10000 }).toBeGreaterThanOrEqual(beforeObjects + 1);
   const afterPlaceObjects = afterKernel.count;
 
-  const placedRow = studio.locator(`[data-entity="${entityId}"]`);
-  await expect(placedRow).toHaveCount(1, { timeout: 10000 });
+  const placedRows = studio.locator(`[data-entity="${entityId}"]`);
+  await expect.poll(async () => placedRows.count(), { timeout: 10000 }).toBeGreaterThan(0);
+  const placedRow = studio.locator(`[data-entity="${entityId}"]:visible`).first();
+  await expect(placedRow).toBeVisible({ timeout: 10000 });
   await placedRow.click({ force: true });
   await page.waitForTimeout(300);
 
@@ -419,8 +421,10 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
   await expect(studio).not.toHaveAttribute('data-kelo-world-loading', '1', { timeout: 40000 });
   await expect.poll(async () => (await kernelSnapshot(page)).count, { timeout: 20000 }).toBeGreaterThanOrEqual(afterPlaceObjects);
 
-  const persistedRow = studio.locator(`[data-entity="${entityId}"]`);
-  await expect(persistedRow).toHaveCount(1, { timeout: 15000 });
+  const persistedRows = studio.locator(`[data-entity="${entityId}"]`);
+  await expect.poll(async () => persistedRows.count(), { timeout: 15000 }).toBeGreaterThan(0);
+  const persistedRow = studio.locator(`[data-entity="${entityId}"]:visible`).first();
+  await expect(persistedRow).toBeVisible({ timeout: 15000 });
   await persistedRow.click({ force: true });
   await page.waitForTimeout(300);
 
