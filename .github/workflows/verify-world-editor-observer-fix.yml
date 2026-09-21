@@ -1,0 +1,47 @@
+name: Verify World Editor Observer Fix
+
+on:
+  push:
+    branches:
+      - fix/world-editor-mobile-action-deck-loop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      KELO_PAGES: http://127.0.0.1:4173/
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --no-package-lock --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Serve patched branch
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/http.log 2>&1 &
+          for i in {1..30}; do
+            curl -fsS http://127.0.0.1:4173/ >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/http.log
+          exit 1
+      - name: Direct World freeze probe
+        run: env -u CI npx playwright test tests/lab-world-open-bisect.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
+      - name: Full mobile World cycle
+        run: env -u CI KELO_VISIBLE_FLOW=1 KELO_CANDIDATE_SHA="${GITHUB_SHA}" npx playwright test tests/lab-world-editor-full-cycle.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-editor-observer-fix-evidence
+          retention-days: 14
+          if-no-files-found: ignore
+          path: |
+            test-results/**
