@@ -208,7 +208,9 @@ function ensureContextBar(shell,root){
     const more=bar.querySelector('.ks-mobile-more');
     if(more){
       const open=shell.dataset.mobileAdvanced==='1';
-      more.textContent=open?'MENOS':'MÁS';more.setAttribute('aria-expanded',open?'true':'false');
+      const nextLabel=open?'MENOS':'MÁS';
+      if(more.textContent!==nextLabel)more.textContent=nextLabel;
+      more.setAttribute('aria-expanded',open?'true':'false');
     }
   }
   return bar;
