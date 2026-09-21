@@ -1,0 +1,35 @@
+name: LAB Verify First Bad Root Cause
+
+on:
+  push:
+    branches:
+      - lab/fix-first-bad-mobile-action-deck-loop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --no-package-lock --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Serve patched first BAD
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/http.log 2>&1 &
+          for i in {1..30}; do
+            curl -fsS http://127.0.0.1:4173/ >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/http.log
+          exit 1
+      - name: Direct World freeze probe
+        env:
+          KELO_PAGES: http://127.0.0.1:4173/
+        run: npx playwright test tests/lab-world-open-bisect.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
