@@ -58,7 +58,8 @@
       window.__KELO_UPDATE_EARLY_HEALTH__=health;
     }
   }catch(e){}
-  window.KELO_WORLD_DECORATION_RESET=true;
+  window.KELO_WORLD_DECORATION_RESET=false;
+  try{window.KELO_WORLD_DECORATION_RESET=new URLSearchParams(location.search).get('decorationReset')==='1'}catch(e){}
   window.KELO_HIDE_MINIMAP=true;
   var minimapSelector='#kw-live-minimap,#kelo-minimap,#minimap,.kelo-minimap,.lx-mark,[data-minimap],[id*="minimap" i],[class*="minimap" i],[id*="mini-map" i],[class*="mini-map" i]';
   var removeMinimapHost=function(el){
