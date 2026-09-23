@@ -81,6 +81,10 @@ test('exact PR bytes boot and sustain 8s movement in iPhone-sized touch context'
   await expect(page.locator('#game-canvas')).toBeVisible({timeout:10000});
   await expect(page.locator('#kelo-account-auth')).toBeHidden({timeout:10000});
 
+  await page.waitForFunction(()=>window.KELO_WORLD_DECORATION_RESET===false && window.KELO_WORLD_AUDIT?.terrainAtlasesReady===true,null,{timeout:30000});
+  const worldBoot=await page.evaluate(()=>({reset:window.KELO_WORLD_DECORATION_RESET,ready:window.KELO_WORLD_AUDIT?.ready===true,terrainAtlasesReady:window.KELO_WORLD_AUDIT?.terrainAtlasesReady===true}));
+  expect(worldBoot).toEqual({reset:false,ready:true,terrainAtlasesReady:true});
+
   const before=await position(page);
   const walk=await touchMoveRightForEightSeconds(page);
   const after=await position(page);
