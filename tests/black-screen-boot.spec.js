@@ -39,6 +39,30 @@ test('normal guest boot renders a non-black world with terrain atlases',async({b
         colors.add((r>>4)+','+(gg>>4)+','+(b>>4)+','+(a>>6));
       }
     }
+    const renderSnapshot=window.KeloRender?.snapshot?.()||null;
+    const cameraSnapshot=window.KeloCamera?.snapshot?.()||null;
+    const worldView=window.KeloCamera?.worldView?.()||null;
+    const player=typeof localPlayer!=='undefined'?{x:localPlayer.x,y:localPlayer.y,vx:localPlayer.vx,vy:localPlayer.vy}:null;
+
+    const probe=document.createElement('canvas');
+    probe.width=innerWidth;probe.height=innerHeight;
+    const pg=probe.getContext('2d');
+    pg.fillStyle='#07090d';pg.fillRect(0,0,probe.width,probe.height);
+    let manualDraw=false;
+    try{
+      const z=window.KeloCamera?.getEffectiveZoom?.()||1;
+      const cam=window.camera||{x:0,y:0};
+      pg.save();pg.translate(probe.width/2,probe.height/2);pg.scale(z,z);pg.translate(-cam.x,-cam.y);
+      manualDraw=window.KELO_WORLD_RENDERER?.draw?.(pg)===true;
+      pg.restore();
+    }catch(error){manualDraw=String(error&&error.stack||error)}
+    const pd=pg.getImageData(0,0,probe.width,probe.height).data;
+    let probeNonDark=0,probeSamples=0;
+    for(let y=0;y<probe.height;y+=8)for(let x=0;x<probe.width;x+=8){
+      const i=(y*probe.width+x)*4;probeSamples++;
+      if(pd[i+3]>20&&Math.max(pd[i],pd[i+1],pd[i+2])>36)probeNonDark++;
+    }
+
     return {
       width:w,height:h,sampled,
       opaqueRatio:sampled?opaque/sampled:0,
@@ -47,9 +71,13 @@ test('normal guest boot renders a non-black world with terrain atlases',async({b
       reset:window.KELO_WORLD_DECORATION_RESET,
       worldReady:window.KELO_WORLD_AUDIT?.ready===true,
       terrainAtlasesReady:window.KELO_WORLD_AUDIT?.terrainAtlasesReady===true,
-      plazaReady:window.KELO_PLAZA_AUDIT?.ready===true
+      plazaReady:window.KELO_PLAZA_AUDIT?.ready===true,
+      renderSnapshot,cameraSnapshot,worldView,player,manualDraw,
+      manualNonDarkRatio:probeSamples?probeNonDark/probeSamples:0
     };
   });
+
+  console.log('BLACK_SCREEN_VISUAL',JSON.stringify({...visual,pageErrors}));
 
   expect(visual.reset).toBe(false);
   expect(visual.worldReady).toBe(true);
