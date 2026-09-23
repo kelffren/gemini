@@ -44,7 +44,7 @@ jobs:
           cat test-results/black-screen-http.log
           exit 1
       - name: Verify world renders and remains playable
-        run: npx playwright test tests/main-stability-mobile.spec.js --project=chromium
+        run: npx playwright test tests/black-screen-boot.spec.js --project=chromium
       - name: Upload evidence
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
