@@ -1,3 +1,9 @@
+/* KELO-INDEX
+ * area: TEST / BOOT / BLACK SCREEN
+ * owner: Black Screen Boot Smoke
+ * purpose: verifica desde Playwright que el arranque guest pinta mundo real y no deja canvas negro
+ * do-not: no inspeccionar implementación interna como criterio de éxito; probar pixels/runtime visibles
+ */
 const { test, expect } = require('@playwright/test');
 
 const BASE_URL=process.env.KELO_PAGES||'http://127.0.0.1:4173/';
