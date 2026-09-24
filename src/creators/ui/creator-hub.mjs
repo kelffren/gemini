@@ -204,6 +204,20 @@ export async function openCreatorHub({root=globalThis}={}){
           const live=doc.getElementById('kelo-studio-live');
           return !!(live?.isConnected&&live.dataset?.keloWorldLoading!=='1'&&live.querySelector?.('.ks-status'));
         };
+        let readyObserver=null;
+        const finishWorldHandoff=()=>{
+          if(!worldEditorReady())return false;
+          try{readyObserver?.disconnect?.();}catch{}
+          readyObserver=null;
+          setTimeout(()=>{try{destroy();}catch{}},250);
+          return true;
+        };
+        const liveForReady=doc.getElementById('kelo-studio-live');
+        if(root.MutationObserver&&liveForReady){
+          readyObserver=new root.MutationObserver(()=>finishWorldHandoff());
+          readyObserver.observe(liveForReady,{attributes:true,childList:true,subtree:true,attributeFilter:['data-kelo-world-loading']});
+        }
+        queueMicrotask(()=>finishWorldHandoff());
         const abortWorldLaunch=()=>{
           const live=doc.getElementById('kelo-studio-live');
           if(worldEditorReady())return false;
@@ -216,16 +230,12 @@ export async function openCreatorHub({root=globalThis}={}){
           return true;
         };
         pending.then(()=>{
-          if(worldEditorReady()){
-            setTimeout(()=>{try{destroy();}catch{}},250);
-            return;
-          }
+          if(finishWorldHandoff())return;
           abortWorldLaunch();
           showLaunchError(id,new Error('WORLD_EDITOR_OPEN_TIMEOUT'));
         }).catch(error=>{
-          if(worldEditorReady()){
+          if(finishWorldHandoff()){
             console.warn('[Kelo Creators → world] launch promise rejected after Studio became interactive; keeping World Editor active',error);
-            try{destroy();}catch{}
             return;
           }
           abortWorldLaunch();
