@@ -1,3 +1,8 @@
+/* KELO-INDEX
+ * area: TEST / ASSET LIBRARY / LIVE QA
+ * owner: Asset Intelligence acceptance
+ * purpose: verify bounded telemetry and mobile live-preview lifecycle instrumentation
+ */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {recordAssetMetric,beginAssetMetric,assetTelemetrySnapshot,clearAssetTelemetry} from '../src/creators/assets/live-asset-telemetry.mjs';
