@@ -5,6 +5,7 @@
  * purpose: Validate and compile downloaded personal content without executing external code.
  */
 import {analyzeAssetSheetPixels,buildAssetSheetManifest} from './asset-sheet-compiler.mjs';
+import {normalizeSceneDocument} from '../importers/scene-importer.mjs';
 
 export const CONTENT_KINDS=Object.freeze(['image','sprite','tileset','animation','vfx','sfx','music','ambience','ability','scene','prefab']);
 const IMAGE_KINDS=new Set(['image','sprite','tileset','animation','vfx']);
@@ -66,15 +67,10 @@ function validateAbilityDefinition(raw){
   const clean=copy(def);delete clean.__proto__;delete clean.constructor;delete clean.prototype;return clean;
 }
 
-function validatePrefabDefinition(raw,asset){
-  const src=raw.prefabDefinition||raw.scene||raw.prefab||raw;
-  if(!src||!Array.isArray(src.children)||!src.children.length||src.children.length>80)throw new Error('CONTENT_SCENE_CHILDREN_INVALID');
-  const bounds={w:Math.max(1,Math.min(8192,Number(src.bounds?.w)||32)),h:Math.max(1,Math.min(8192,Number(src.bounds?.h)||32))};
-  const children=src.children.map((child,index)=>{
-    if(!child||!safe(child.prefabId))throw new Error('CONTENT_SCENE_CHILD_INVALID:'+index);
-    return {prefabId:safe(child.prefabId),dx:Number(child.dx)||0,dy:Number(child.dy)||0,rotation:Number(child.rotation)||0,bounds:{w:Math.max(1,Number(child.bounds?.w)||32),h:Math.max(1,Number(child.bounds?.h)||32)},components:copy(child.components||{})};
-  });
-  return {id:safe(src.id)||`creator-prefab:personal:${safe(asset.externalId||asset.id).replace(/[^a-z0-9_-]+/gi,'-')}`,version:1,label:safe(src.label||asset.name||'Personal Scene'),category:'My Prefabs',bounds,children,createdAt:Date.now(),updatedAt:Date.now(),external:{provider:asset.provider,license:asset.license,author:asset.author||null,sourceUrl:asset.sourceUrl||null}};
+function compileScene(raw,asset,kind){
+  const normalized=normalizeSceneDocument(raw,asset);
+  const prefabDefinition={...normalized.prefabDefinition,external:{provider:asset.provider,license:asset.license,author:asset.author||null,sourceUrl:asset.sourceUrl||null}};
+  return {kind,manifest:{schema:'kelo-personal-scene-v2',version:2,contentKind:kind,id:asset.id,name:asset.name,prefabDefinition,importReport:normalized.importReport,external:{provider:asset.provider,license:asset.license,author:asset.author||null,sourceUrl:asset.sourceUrl||null}},compiler:'scene-importer-v1'};
 }
 
 export async function integrateContentBlob(asset,blob){
@@ -83,7 +79,7 @@ export async function integrateContentBlob(asset,blob){
   if(IMAGE_KINDS.has(kind))return{kind,manifest:await compileVisual(asset,blob,kind),compiler:'asset-sheet-compiler'};
   if(AUDIO_KINDS.has(kind))return{kind,manifest:compileAudio(asset,blob,kind),compiler:'personal-audio-manifest'};
   if(kind==='ability'){const json=await parseJson(blob),definition=validateAbilityDefinition(json);return{kind,manifest:{schema:'kelo-personal-ability-v1',version:1,contentKind:'ability',id:asset.id,name:asset.name,definition,external:{provider:asset.provider,license:asset.license,author:asset.author||null,sourceUrl:asset.sourceUrl||null}},compiler:'ability-contract-validator'};}
-  if(kind==='scene'||kind==='prefab'){const json=await parseJson(blob),prefabDefinition=validatePrefabDefinition(json,asset);return{kind,manifest:{schema:'kelo-personal-scene-v1',version:1,contentKind:kind,id:asset.id,name:asset.name,prefabDefinition,external:{provider:asset.provider,license:asset.license,author:asset.author||null,sourceUrl:asset.sourceUrl||null}},compiler:'studio-prefab-validator'};}
+  if(kind==='scene'||kind==='prefab'){const json=await parseJson(blob);return compileScene(json,asset,kind);}}
   throw new Error('CONTENT_KIND_UNSUPPORTED:'+kind);
 }
 
