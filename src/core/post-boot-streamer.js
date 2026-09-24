@@ -7,7 +7,7 @@
 (function(root){
   'use strict';
   if(root.KELO_POST_BOOT_STREAMER)return;
-  const VERSION='kelo-post-boot-streamer-v2-idle-aware';
+  const VERSION='kelo-post-boot-streamer-v2.1-world-handoff';
   const FILES=[
     'src/core/feature-registry.js?v=4',
     'src/core/asset-registry.js?v=2-feature-registry',
@@ -27,7 +27,7 @@
     'src/systems/admin-key-system.js?v=1',
     'src/core/admin-control-lazy-gate.js?v=2',
     'src/core/account-live-control-gate.js?v=2',
-    'src/core/creators-lazy-gate.js?v=8-ios-open-20260917'
+    'src/core/creators-lazy-gate.js?v=world-editor-20260924-2'
   ];
   const audit=root.KELO_INSTANT_BOOT_AUDIT={version:VERSION,startedAt:0,firstYieldAt:0,loaded:0,total:FILES.length,ready:false,failed:[]};
 
