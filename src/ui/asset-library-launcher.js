@@ -37,7 +37,9 @@ async function previewExternalAsset(asset){
    const workspace=await platform.openWorkspace('world');
    if(!workspace?.studio?.kernel)throw new Error('LIVE_PREVIEW_WORLD_NOT_READY');
    const bridge=await import('./../studio/integration/external-live-preview-bridge.mjs?v=1');
-   const result=await bridge.startExternalAssetPreview({root,session:workspace,asset});
+   const studio=workspace.studio,selected=studio.kernel.selection?.get?.()||[];
+   const swapEntityId=selected.length===1?String(selected[0]):null;
+   const result=swapEntityId?await bridge.startExternalAssetSwap({root,session:workspace,asset,entityId:swapEntityId}):await bridge.startExternalAssetPreview({root,session:workspace,asset});
    try{root.KELO_LUXE?.closeMenu?.();}catch{}
    return result;
  })().finally(()=>{livePreviewPromise=null;});
@@ -93,7 +95,7 @@ root.addEventListener('kelo:community-player-assets',event=>{if(root.__KELO_COMM
 root.addEventListener('kelo:forest-plaza-catalog-ready',()=>void hydratePersonalContent().catch(()=>{}));
 document.addEventListener('click',event=>{if(event.target?.closest?.('#lx-create-studio,#lx-create-asset-forge'))void hydratePersonalContent().catch(()=>{});},true);
 root.addEventListener('kelo:asset-selection-changed',()=>refresh(document.getElementById(ID)));root.addEventListener('storage',()=>refresh(document.getElementById(ID)));
-const api=Object.freeze({version:'content-library-launcher-v14-local-scene-match',open:openLibrary,openSpriteOS,openPacks,openCommunityCreator,buildPersonalContent,buildPersonalPalette,previewExternalAsset,hydratePersonalAssets,hydratePersonalContent,ensureCommunityRuntime,bindCommunityNetworkBridge,refresh:()=>refresh(document.getElementById(ID))});
+const api=Object.freeze({version:'content-library-launcher-v15-persisted-swap',open:openLibrary,openSpriteOS,openPacks,openCommunityCreator,buildPersonalContent,buildPersonalPalette,previewExternalAsset,hydratePersonalAssets,hydratePersonalContent,ensureCommunityRuntime,bindCommunityNetworkBridge,refresh:()=>refresh(document.getElementById(ID))});
 root.KELO_ASSET_LIBRARY_LAUNCHER=api;root.KELO_CONTENT_LIBRARY_LAUNCHER=api;
 maybeLoadLookRuntime();if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
 })(typeof globalThis!=='undefined'?globalThis:window);
