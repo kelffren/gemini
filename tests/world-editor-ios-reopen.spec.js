@@ -73,7 +73,7 @@ test('World recovers a stale Studio session instead of leaving iOS on a black pa
     // KeloInputLocks is intentionally created by bootKeloCreators(). Do not wait
     // for a lazy Creator-owned contract before giving its owner a chance to boot.
     await page.evaluate(async () => {
-      const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs');
+      const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs?v=world-editor-20260924-2');
       await openCreatorHub({ root: window });
     });
     const hub = page.locator('#kelo-creators-hub');
