@@ -4,7 +4,7 @@
  * keys: PACKS FOLDERS CATEGORIES BREADCRUMBS SUBSEARCH MOBILE METADATA ONLY
  * purpose: browse real provider-backed categories and packs inside Kelo before downloading assets
  */
-import {getExternalLibraryFacets,clearExternalLibraryFacetCache} from '../creators/assets/external-library-facets.mjs?v=1';
+import {getExternalLibraryFacets,clearExternalLibraryFacetCache} from '../creators/assets/external-library-facets.mjs?v=2';
 import {getProviderStatuses} from '../creators/assets/external-asset-providers.mjs?v=10';
 
 const root=globalThis,doc=root.document;

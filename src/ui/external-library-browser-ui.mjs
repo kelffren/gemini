@@ -4,7 +4,7 @@
  * keys: EXTERNAL LIBRARIES PROVIDERS EXPLORE SEARCH PAGINATION MOBILE NO-DOWNLOAD PACKS FOLDERS DIRECT-JUMP DISPOSABLE-PAGES
  * purpose: turn the Sources tab into an in-app library navigator without downloading binaries while browsing
  */
-import './external-library-folder-browser-ui.mjs?v=1';
+import './external-library-folder-browser-ui.mjs?v=2';
 import './external-library-page-lifecycle.mjs?v=4';
 import {getProviderStatuses} from '../creators/assets/external-asset-providers.mjs?v=11';
 

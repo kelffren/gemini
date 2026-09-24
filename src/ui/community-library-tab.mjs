@@ -4,7 +4,7 @@
  * keys: COMMUNITY CATALOG EQUIP UNEQUIP SLOT PREVIEW MOBILE LAZY
  * purpose: extend asset-vault.html with a community catalog while preserving its external-provider and personal-vault flows
  */
-import './external-library-browser-ui.mjs?v=5';
+import './external-library-browser-ui.mjs?v=6';
 import {
   listCommunityAssets,
   listEquippedCommunityAssets,
@@ -45,7 +45,7 @@ function mount(){
   if(!$('community-view')){
     const section=doc.createElement('section');section.id='community-view';section.hidden=true;section.innerHTML=`
       <div class="section-title"><h2>Assets de la comunidad</h2><span id="community-count">Bajo demanda</span></div>
-      <p class="community-summary">Solo se muestran publicaciones activas. Equipar guarda una referencia al asset; el PNG/WebP/JPEG se descarga en el teléfono únicamente cuando el avatar lo necesita.</p>
+      <p class="community-summary">Looks de otros jugadores. Equipar cambia la ropa, no coloca props en el mapa. Si el servidor de publicación no está conectado, aquí no aparece nada nuevo.</p>
       <div class="filters"><button class="btn community-refresh" id="community-refresh" type="button">Actualizar</button></div>
       <main class="grid" id="community-grid"><div class="empty">Abre Comunidad para cargar el catálogo.</div></main>`;
     const sources=$('sources-view');sources?.parentNode?.insertBefore(section,sources);

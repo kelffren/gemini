@@ -24,6 +24,14 @@ function clone(result){return{...result,categories:(result.categories||[]).map(x
 function supportedKenneyPath(path){return /^(?:2d|ui|icons)\//i.test(path)&&/\.(?:png|webp|jpe?g)$/i.test(path);}
 
 async function kenneyFacets(provider){
+  const localUrl=new URL('../../../data/kenney-facets.json?v=1',import.meta.url).href;
+  try{
+    const response=await fetch(localUrl,{cache:'force-cache'});
+    if(response.ok){
+      const data=await response.json();
+      return{providerId:provider.id,mode:data.mode||'precomputed-folders',categories:data.categories||[],packs:data.packs||[],declaredTypes:data.declaredTypes||[],summary:data.summary||{complete:true}};
+    }
+  }catch(error){console.warn('[Kelo kenney facets] local index failed',error);}
   const response=await fetch(provider.indexUrl,{mode:'cors',cache:'force-cache'});
   if(!response.ok)throw new Error('KENNEY_FACETS_'+response.status);
   const body=await response.text();
