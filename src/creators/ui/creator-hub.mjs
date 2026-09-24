@@ -75,7 +75,6 @@ async function openCreatorHubImpl({root=globalThis}={}){
     try{doc.body.classList.remove('kelo-studio-active');}catch{}
     try{doc.getElementById('kelo-world-launch-curtain')?.remove();}catch{}
     try{doc.querySelector('canvas.kelo-studio-overlay')?.remove();}catch{}
-    active=null;
     return true;
   };
   clearStaleStudioChrome();
