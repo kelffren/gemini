@@ -49,6 +49,9 @@ jobs:
           done
           cat test-results/http.log
           exit 1
+      - name: Trace Hub duplication
+        continue-on-error: true
+        run: npx playwright test tests/tmp-hub-duplicate-trace.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
       - name: Hub and property runtime
         run: npx playwright test tests/tmp-current-main-hub-world.spec.js tests/tmp-properties-feature-current-main.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
       - name: Mobile Studio regressions
