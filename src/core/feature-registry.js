@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KELO_FEATURE_REGISTRY)return;
-const VERSION='kelo-feature-registry-v2.7.0-pvp-auto-reducer';
+const VERSION='kelo-feature-registry-v2.8.0-property-core';
 const raw={
   social:{dependencies:[],policy:'first-use',files:[
     {src:'src/ui/player-nameplate.js?v=2',name:'placas'},
@@ -59,11 +59,21 @@ const raw={
   bag:{dependencies:[],policy:'first-use',files:[
     {src:'src/ui/backpack-fantasy-v1.css?v=1',name:'estilo mochila',type:'style'},{src:'src/systems/backpack-system.js?v=2',name:'mochila'},{src:'src/ui/backpack-ui.js?v=4',name:'mochila'}
   ]},
-  mounts:{dependencies:[],policy:'first-use',files:[{src:'src/mounts/mount-catalog.js?v=2',name:'monturas'},{src:'src/mounts/mount-system.js?v=2',name:'monturas'},{src:'src/ui/mount-panel.js?v=2',name:'monturas'}]},
+  mounts:{dependencies:[],policy:'first-use',files:[{src:'src/stats/stat-modifier-system.js?v=1',name:'stats monturas'},{src:'src/mounts/mount-catalog.js?v=2',name:'catálogo monturas'},{src:'src/mounts/mount-equipment-catalog.js?v=2',name:'equipo monturas'},{src:'src/mounts/mount-system.js?v=2',name:'runtime monturas'},{src:'src/ui/mount-panel.js?v=2',name:'UI monturas'}]},
   market:{dependencies:[],policy:'first-use',files:[{src:'src/systems/market-escrow-system.js?v=1',name:'mercado'},{src:'src/ui/market-ui.js?v=2',name:'mercado'}]},
   titles:{dependencies:[],policy:'first-use',files:[{src:'src/systems/title-catalog.js?v=1',name:'títulos'},{src:'src/systems/player-stats.js?v=1',name:'títulos'},{src:'src/systems/title-system.js?v=1',name:'títulos'}]},
-  appearance:{dependencies:[],policy:'first-use',files:[{src:'src/characters/character-customization.js?v=1',name:'apariencia'},{src:'src/ui/character-customizer-ui.js?v=1',name:'apariencia'}]},
-  properties:{dependencies:[],policy:'first-use',files:[{src:'src/property/property-system.js?v=4',name:'propiedades'},{src:'src/ui/house-instance-ui.js?v=1',name:'propiedades'}]}
+  appearance:{dependencies:[],policy:'first-use',files:[{src:'src/characters/character-slot-schema.js?v=1',name:'schema apariencia'},{src:'src/characters/character-customization.js?v=1',name:'runtime apariencia'},{src:'src/ui/character-customizer-ui.js?v=1',name:'UI apariencia'}]},
+  'property-core':{dependencies:[],policy:'first-use',files:[
+    {src:'src/property/property-asset-catalog.js?v=creator-assets-20260915-1',name:'catálogo propiedades'},
+    {src:'src/property/property-system.js?v=4',name:'runtime propiedades'}
+  ]},
+  properties:{dependencies:['property-core'],policy:'first-use',files:[
+    {src:'src/instances/instance-system.js?v=1',name:'instancias'},
+    {src:'src/instances/instance-runtime-bridge.js?v=1',name:'runtime instancias'},
+    {src:'src/instances/house-instance.js?v=1',name:'casas'},
+    {src:'src/instances/property-house-bridge.js?v=1',name:'puente casa-propiedad'},
+    {src:'src/ui/house-instance-ui.js?v=1',name:'UI propiedades'}
+  ]}
 };
 const ALIASES=Object.freeze({nobility:'social',emotes:'social'});
 const definitions=Object.create(null);
