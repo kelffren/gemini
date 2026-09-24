@@ -1,0 +1,57 @@
+name: Verify World Context Deck Fix
+
+on:
+  push:
+    branches:
+      - fix/world-context-deck-freeze-1d4ec500
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-world-open:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: true
+      KELO_PAGES: http://127.0.0.1:4173/
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install --no-package-lock --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Serve branch
+        shell: bash
+        run: |
+          mkdir -p test-results
+          python3 -m http.server 4173 --bind 127.0.0.1 > test-results/http.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat test-results/http.log
+          exit 1
+
+      - name: World loading freeze probe
+        run: npx playwright test tests/lab-world-open-bisect.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-context-deck-fix-evidence
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            test-results/**
