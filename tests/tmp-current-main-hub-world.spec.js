@@ -28,6 +28,13 @@ test('full Creator Hub hands off to World without loading full house stack',asyn
   await world.dispatchEvent('pointerup',{pointerType:'touch',isPrimary:true,button:0});
   const studio=page.locator('#kelo-studio-live');await expect(studio).toBeVisible({timeout:20000});
   await expect(studio).not.toHaveAttribute('data-kelo-world-loading','1',{timeout:50000});
+  const hubDiag=await page.evaluate(()=>({
+    hubs:[...document.querySelectorAll('#kelo-creators-hub')].map(el=>({seq:el.dataset.keloHubSeq||null,module:el.dataset.keloHubModule||null,display:getComputedStyle(el).display,connected:el.isConnected})),
+    shared:window.__KELO_CREATOR_HUB_SINGLETON_V1__?.hub?.dataset?.keloHubSeq||null,
+    opening:!!window.__KELO_CREATOR_HUB_OPENING_V1__,
+    resources:performance.getEntriesByType('resource').map(x=>x.name).filter(x=>x.includes('creator-hub.mjs'))
+  }));
+  console.log('[HUB_DUPLICATE_DIAG]',JSON.stringify(hubDiag));
   await expect(hub).toHaveCount(0,{timeout:10000});
   const state=await page.evaluate(()=>({
     active:document.body.classList.contains('kelo-studio-active'),
