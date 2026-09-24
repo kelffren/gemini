@@ -1,0 +1,57 @@
+name: LAB Current Main Audit Fix Matrix
+on:
+  push:
+    branches: [lab/current-main-audit-fixes-bf813]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI: true
+      KELO_PAGES: http://127.0.0.1:4173/
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Static integrity
+        run: node scripts/tmp-current-main-integrity-audit.mjs
+      - name: Studio static audits
+        run: |
+          npm run audit:studio
+          npm run audit:property
+          npm run audit:studio:placement-touch
+          npm run audit:studio:mobile-hit-slop
+          npm run audit:studio:context
+      - run: npx playwright install chromium --with-deps
+      - name: Serve
+        shell: bash
+        run: |
+          mkdir -p test-results
+          python3 -m http.server 4173 --bind 127.0.0.1 >test-results/http.log 2>&1 &
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:4173/index.html >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat test-results/http.log
+          exit 1
+      - name: Hub and property runtime
+        run: npx playwright test tests/tmp-current-main-hub-world.spec.js tests/tmp-properties-feature-current-main.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
+      - name: Mobile Studio regressions
+        run: npx playwright test tests/studio-mobile-context-ui.spec.js tests/studio-mobile-tools-sheet.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
+      - name: World regressions
+        run: npx playwright test tests/world-editor-live-open.spec.js tests/world-editor-ios-reopen.spec.js tests/iphone-world-visible-flow.spec.js tests/world-placement-functional.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
+      - name: Boot regressions
+        run: npx playwright test tests/main-stability-mobile.spec.js tests/black-screen-boot.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: current-main-audit-fix-matrix
+          if-no-files-found: ignore
+          retention-days: 14
+          path: test-results/**
