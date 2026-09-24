@@ -50,8 +50,27 @@ function consumePendingExternalPreview(){
  if((requested||asset)&&asset)void previewExternalAsset(asset).catch(error=>{console.error('[Kelo external live preview]',error);try{root.showToast?.(String(error?.message||error).replaceAll('_',' '));}catch{}});
 }
 function consumePendingBuild(){let id='',paletteRequested=false,ids=[];try{const params=new URLSearchParams(root.location?.search||'');id=params.get('buildAsset')||'';paletteRequested=params.get('buildPalette')==='1';if((id||paletteRequested)&&root.history?.replaceState){params.delete('buildAsset');params.delete('buildPalette');const q=params.toString();root.history.replaceState(null,'',`${root.location.pathname}${q?`?${q}`:''}${root.location.hash||''}`);}}catch{}try{const raw=root.localStorage?.getItem(BUILD_HANDOFF_KEY);if(raw){const row=JSON.parse(raw);if(!id&&Date.now()-Number(row?.at||0)<120000)id=String(row?.id||'');root.localStorage.removeItem(BUILD_HANDOFF_KEY);}}catch{}try{const raw=root.localStorage?.getItem(PALETTE_HANDOFF_KEY);if(raw){const row=JSON.parse(raw);if(Date.now()-Number(row?.at||0)<120000&&Array.isArray(row?.ids))ids=row.ids;root.localStorage.removeItem(PALETTE_HANDOFF_KEY);}}catch{}if((paletteRequested||ids.length)&&ids.length>=2){void buildPersonalPalette(ids).catch(error=>{console.error('[Kelo library palette]',error);try{root.showToast?.(String(error?.message||error).replaceAll('_',' '));}catch{}});return;}if(id)void buildPersonalContent(id).catch(error=>{console.error('[Kelo library build]',error);try{root.showToast?.(String(error?.message||error).replaceAll('_',' '));}catch{}});}
+async function captureAssetSceneProfile(){
+  if(!root.KELO_STUDIO_LAZY_BOOT)return null;
+  try{
+    const mod=await import('./../studio/studio-entry.mjs');
+    const studio=mod.getKeloStudioSession?.(),doc=studio?.kernel?.document;
+    if(!doc)return null;
+    const categories=new Map(),styles=new Map(),sizes=[];
+    for(const entity of (doc.entities||[]).slice(0,800)){
+      const prefab=studio.kernel.prefabs.resolve?.(entity?.prefabId);if(!prefab)continue;
+      const category=String(prefab.category||'').toLowerCase();if(category)categories.set(category,(categories.get(category)||0)+1);
+      const catalog=studio.adapter?.assetCatalog?.get?.(entity.prefabId);for(const token of [catalog?.family,catalog?.category,prefab.category]){const value=String(token||'').toLowerCase();if(value)styles.set(value,(styles.get(value)||0)+1);}
+      const w=Number(prefab.bounds?.w||entity?.bounds?.w||0),h=Number(prefab.bounds?.h||entity?.bounds?.h||0);if(w>0&&h>0)sizes.push(Math.max(w,h));
+    }
+    const sorted=map=>[...map.entries()].sort((a,b)=>b[1]-a[1]).map(x=>x[0]),orderedCategories=sorted(categories),orderedStyles=sorted(styles);
+    sizes.sort((a,b)=>a-b);const targetSize=sizes.length?sizes[Math.floor(sizes.length/2)]:96;
+    const profile={version:1,worldId:doc.worldId||null,sceneName:doc.metadata?.name||'Kelo World',category:orderedCategories[0]||null,styleTags:[...new Set(['kelo-world','game-ready','top-down',...orderedStyles.slice(0,8),...(doc.metadata?.tags||[])])].slice(0,14),perspective:'top-down',environment:doc.metadata?.name||null,targetSize,entityCount:(doc.entities||[]).length,updatedAt:Date.now()};
+    root.KELO_ASSET_SCENE_PROFILE=profile;root.localStorage?.setItem?.('kelo.asset.scene-profile.v1',JSON.stringify(profile));return profile;
+  }catch(error){console.warn('[Kelo asset scene profile]',error);return null;}
+}
 function openPage(path){const opened=root.open(path,'_blank');if(!opened)root.location.href=path;try{root.KELO_LUXE?.closeMenu?.();}catch{}}
-const openSpriteOS=()=>openPage('sprite-os.html'),openLibrary=()=>openPage('asset-vault.html'),openPacks=()=>openPage('content-packs.html'),openCommunityCreator=()=>openPage('creator-publish.html');
+const openSpriteOS=()=>openPage('sprite-os.html'),openLibrary=()=>{void captureAssetSceneProfile();openPage('asset-vault.html');},openPacks=()=>openPage('content-packs.html'),openCommunityCreator=()=>openPage('creator-publish.html');
 function menuButton(id,label,copy,icon,onClick,aria){const b=document.createElement('button');b.id=id;b.type='button';b.className='lx-menu-item';b.setAttribute('aria-label',aria);b.innerHTML=`<span class="lx-menu-icon" aria-hidden="true">${icon}</span><span class="lx-menu-copy"><b>${label}</b><small>${copy}</small></span>`;b.addEventListener('click',onClick);return b;}
 function buildSpriteButton(){return menuButton(SPRITE_ID,'Sprite OS','Buscar · probar · usar en juego','🧍',openSpriteOS,'Abrir Sprite OS');}
 function buildButton(){const b=menuButton(ID,'Biblioteca','Poner en la plaza','🧰',openLibrary,'Abrir Biblioteca');refresh(b);return b;}
