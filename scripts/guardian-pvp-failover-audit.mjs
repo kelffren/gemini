@@ -51,7 +51,9 @@ assert.match(adapter,/takeoverSequenceResync:true/);
 
 // Registry release labels evolve independently; the failover contract is the
 // Guardian feature family plus the explicitly pinned worker-prune host below.
-assert.match(registry,/kelo-feature-registry-v2\.\d+\.\d+-guardian-[a-z0-9-]+/);
+assert.match(registry,/const VERSION='kelo-feature-registry-v2\.\d+\.\d+-[a-z0-9-]+';/);
+assert.match(registry,/guardian:\{dependencies:\[\],policy:'first-use'/);
+assert.match(registry,/pvp:\{dependencies:\['guardian'\],policy:'first-use'/);
 assert.match(registry,/guardian-pvp-host\.js\?v=4-worker-prune/);
 
 assert.match(testSource,/KELO_GUARDIAN_TEST_ADMIN_EMAIL/);
