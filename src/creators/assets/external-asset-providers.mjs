@@ -22,6 +22,7 @@ import {installUniversalAvatarTryOn} from './universal-avatar-tryon.mjs?v=1';
 import {installUniversalLookBuilder} from './universal-look-builder.mjs?v=1';
 import {rankAssets} from './asset-quality-ranker.mjs?v=1';
 import {installAssetIntelligenceLiveUI} from '../../ui/asset-intelligence-live-ui.mjs?v=1';
+import {beginAssetMetric,recordAssetMetric} from './live-asset-telemetry.mjs?v=1';
 
 const CONFIG_URL=new URL('../../../data/external-asset-providers.json?v=14',import.meta.url).href;
 const DEFAULT_PAGE_SIZE=80,MAX_PROVIDER_PAGE=320,MAX_FEDERATED_RESULTS=160,MAX_RECENT_ASSETS=640,MAX_THUMBNAIL_CONCURRENCY=6;
@@ -61,6 +62,7 @@ if(provider.id==='sfxmint'&&provider.mode==='lazy-live-api'){if(options.contentK
 if(provider.id==='opensource3d'&&provider.mode==='lazy-live-api'){if(options.contentKind&&options.contentKind!=='all'&&options.contentKind!=='model')return{provider,assets:[],error:null,page:{offset,limit,hasMore:false}};const result=await searchOpenSource3DAssets(query,{...options,offset,limit});return{provider,assets:result.assets,error:null,page:{offset:result.offset,limit:result.limit,total:result.total,hasMore:result.hasMore,engine:result.engine,requiresQuery:result.requiresQuery===true}};}
 return{provider,assets:[],error:null,page:{offset,limit,hasMore:false}};}catch(error){return{provider,assets:[],error:String(error?.message||error),page:{offset,limit,hasMore:false}};}}
 export async function searchExternalAssets(query='',options={}){
+  const finishSearchMetric=beginAssetMetric('search',{queryLength:String(query||'').length});
   const cfg=await loadProviderConfig(),providers=(cfg.providers||[]).filter(p=>p.enabled!==false),qa=browserQA(),wanted=options.providers?.length?new Set(options.providers):qa.provider?new Set([qa.provider]):null,q=clean(query).toLowerCase(),includeLazy=!!wanted||options.includeLazy===true,{offset,limit}=pageOptions(options),selected=providers.filter(p=>wanted?wanted.has(p.id):(!isLazy(p)||(includeLazy&&(q.length>0||p.requiresQuery!==true)))),perProviderLimit=wanted?limit:Math.max(1,Math.min(limit,Math.floor(MAX_FEDERATED_RESULTS/Math.max(1,selected.length)))),bundles=await Promise.all(selected.map(p=>browseProvider(p.id,{query:q,offset,limit:perProviderLimit,contentKind:options.contentKind})));
   const providerCapabilities=new Map(providers.map(p=>[p.id,p]));
   let assets=bundles.flatMap(b=>b.assets||[]).map(asset=>{const p=providerCapabilities.get(asset?.provider)||{};return{...asset,supportsRemotePreview:p.supportsRemotePreview!==false,supportsCORS:p.supportsCORS!==false,supportsThumbnail:p.supportsThumbnail!==false,supportsOriginalDownload:p.supportsOriginalDownload!==false&&p.catalogOnly!==true};});
@@ -72,6 +74,7 @@ export async function searchExternalAssets(query='',options={}){
   if(options.rank!==false)assets=rankAssets(assets,{query:q,sceneProfile,weights:options.rankWeights});
   assets=assets.slice(0,wanted?MAX_PROVIDER_PAGE:MAX_FEDERATED_RESULTS);
   rememberRecent(assets);
+  finishSearchMetric({results:assets.length,providers:bundles.length,failures:bundles.filter(b=>!!b.error).length});if(bundles.some(b=>b.error))recordAssetMetric('search.provider-failure',{providers:bundles.filter(b=>b.error).map(b=>b.provider?.id).filter(Boolean)});
   return{assets,providers:bundles.map(b=>({id:b.provider.id,name:b.provider.name,mode:b.provider.mode,error:b.error,count:b.assets?.length||0,total:b.page?.total??null,engine:b.page?.engine||null,browseUrl:b.provider.browseUrl||b.provider.sourceUrl,license:b.provider.license,lazy:isLazy(b.provider),verified:b.provider.verified===true,requiresQuery:b.page?.requiresQuery===true||b.provider.requiresQuery===true,supportsRemotePreview:b.provider.supportsRemotePreview!==false,supportsCORS:b.provider.supportsCORS!==false,supportsThumbnail:b.provider.supportsThumbnail!==false,supportsOriginalDownload:b.provider.supportsOriginalDownload!==false&&b.provider.catalogOnly!==true})),page:{offset,limit:perProviderLimit,hasMore:bundles.some(b=>!!b.page?.hasMore),lazyIncluded:includeLazy,bounded:true,maxResults:MAX_FEDERATED_RESULTS,ranking:options.rank===false?'provider-order':'asset-intelligence-v1'}};
 }
 function activePagePreviewConcurrency(){
