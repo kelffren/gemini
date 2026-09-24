@@ -37,7 +37,7 @@ const LEGACY_FALLBACK=Object.freeze({
   mounts:Object.freeze([{src:'src/mounts/mount-catalog.js?v=2',name:'monturas'},{src:'src/mounts/mount-system.js?v=2',name:'monturas'},{src:'src/ui/mount-panel.js?v=2',name:'monturas'}]),
   market:Object.freeze([{src:'src/systems/market-escrow-system.js?v=1',name:'mercado'},{src:'src/ui/market-ui.js?v=2',name:'mercado'}]),
   titles:Object.freeze([{src:'src/systems/title-catalog.js?v=1',name:'títulos'},{src:'src/systems/player-stats.js?v=1',name:'títulos'},{src:'src/systems/title-system.js?v=1',name:'títulos'}]),
-  appearance:Object.freeze([{src:'src/characters/character-customization.js?v=1',name:'apariencia'},{src:'src/ui/character-customizer-ui.js?v=1',name:'apariencia'}]),
+  appearance:Object.freeze([{src:'src/characters/character-slot-schema.js?v=1',name:'schema apariencia'},{src:'src/characters/character-customization.js?v=1',name:'runtime apariencia'},{src:'src/ui/character-customizer-ui.js?v=1',name:'UI apariencia'}]),
   properties:Object.freeze([{src:'src/property/property-system.js?v=4',name:'propiedades'},{src:'src/ui/house-instance-ui.js?v=1',name:'propiedades'}])
 });
 const loaded=Object.create(null);
