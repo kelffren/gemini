@@ -1,0 +1,31 @@
+name: LAB Semantic Palette Edge Cases
+on:
+  push:
+    branches: [lab/semantic-palette-edge-24ccd]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      KELO_PAGES: http://127.0.0.1:4173/
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install chromium --with-deps
+      - name: Serve
+        shell: bash
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/semantic-palette.log 2>&1 &
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:4173/index.html >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Semantic palette edge tests
+        run: npx playwright test tests/tmp-semantic-palette-edge.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
