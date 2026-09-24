@@ -1,3 +1,8 @@
+/* KELO-INDEX
+ * area: TEST / ASSET LIBRARY / LIVE QA
+ * owner: Asset Intelligence acceptance
+ * purpose: verify bounded telemetry and mobile live-preview lifecycle instrumentation
+ */
 const { test, expect } = require('@playwright/test');
 const fs=require('fs');
 
