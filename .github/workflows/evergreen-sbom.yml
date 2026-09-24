@@ -38,7 +38,7 @@ jobs:
           mkdir -p artifacts/sbom
           ./node_modules/.bin/cyclonedx-npm --package-lock-only --output-format JSON --output-file artifacts/sbom/root.cdx.json package.json
           ./node_modules/.bin/cyclonedx-npm --package-lock-only --output-format JSON --output-file artifacts/sbom/server.cdx.json server/package.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: kelo-world-sbom
           path: artifacts/sbom/*.json
