@@ -42,7 +42,7 @@
     return;
   }
   const plazaNatureAtlas = Object.freeze({
-    id:'plaza-nature', src:'assets/pn-233db909.png', retiredVisual:true,
+    id:'plaza-nature', src:'assets/pn-233db909.png?art=233db909', retiredVisual:true,
     width:plazaNatureMeta.width, height:plazaNatureMeta.height,
     frameMode:'irregular', frames:plazaNatureMeta.frames,
     spriteCount:Object.keys(plazaNatureMeta.frames).length
