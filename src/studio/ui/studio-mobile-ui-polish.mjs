@@ -152,6 +152,11 @@ function shortcutButton(doc,{label,kind,value,danger=false},source,sync){
   return button;
 }
 
+function advancedToolsOpen(shell){
+  const sheet=shell?.querySelector?.(':scope > .ks-tools-sheet');
+  return !!(sheet?.open||sheet?.hasAttribute?.('open')||shell?.dataset?.mobileAdvanced==='1');
+}
+
 function ensureContextBar(shell,root){
   const deck=shell.querySelector('.ks-deck');
   const deckHead=deck?.querySelector('.ks-deck-head');
@@ -188,9 +193,10 @@ function ensureContextBar(shell,root){
       if(source)bar.append(shortcutButton(shell.ownerDocument,action,source,sync));
     }
     const more=shell.ownerDocument.createElement('button');
-    more.type='button';more.className='ks-mobile-more';more.textContent=shell.dataset.mobileAdvanced==='1'?'MENOS':'MÁS';
+    const open=advancedToolsOpen(shell);
+    more.type='button';more.className='ks-mobile-more';more.textContent=open?'MENOS':'MÁS';
     more.setAttribute('aria-label','Mostrar herramientas avanzadas');
-    more.setAttribute('aria-expanded',shell.dataset.mobileAdvanced==='1'?'true':'false');
+    more.setAttribute('aria-expanded',open?'true':'false');
     more.addEventListener('click',()=>{
       const open=shell.dataset.mobileAdvanced!=='1';
       shell.dataset.mobileAdvanced=open?'1':'0';
@@ -207,7 +213,7 @@ function ensureContextBar(shell,root){
     }
     const more=bar.querySelector('.ks-mobile-more');
     if(more){
-      const open=shell.dataset.mobileAdvanced==='1';
+      const open=advancedToolsOpen(shell);
       const label=open?'MENOS':'MÁS';
       const expanded=open?'true':'false';
       if(more.textContent!==label)more.textContent=label;
