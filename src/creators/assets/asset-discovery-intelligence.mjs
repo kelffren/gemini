@@ -36,7 +36,7 @@ function textOf(a){return [a.id,a.name,a.title,a.description,a.category,a.type,.
 function hasPhrase(text,arr){return arr.some(x=>text.includes(x))}
 export function classifyAsset(asset={}){
  const t=textOf(asset); let type=String(asset.type||'').toLowerCase();
- if(!type||type==='asset'){for(const [k,v] of Object.entries(TYPE_RULES)){if(hasPhrase(t,v)){type=k;break}}}
+ if(!type||type==='asset'){const roomSignal=hasPhrase(t,TYPE_RULES.room), dungeonSignal=hasPhrase(t,TYPE_RULES.dungeon);if(roomSignal)type='room';else if(dungeonSignal)type='dungeon';else for(const [k,v] of Object.entries(TYPE_RULES)){if(k!=='room'&&k!=='dungeon'&&hasPhrase(t,v)){type=k;break}}}
  if(!type||type==='asset')type='prop';
  const gameplay=[]; for(const k of ['boss','treasure','puzzle','trap'])if(t.includes(k))gameplay.push(k);
  return Object.freeze({...asset,type,gameplay:Object.freeze(gameplay)});
