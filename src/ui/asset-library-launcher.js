@@ -79,6 +79,15 @@ async function captureAssetSceneProfile(){
     root.KELO_ASSET_SCENE_PROFILE=profile;root.localStorage?.setItem?.('kelo.asset.scene-profile.v1',JSON.stringify(profile));return profile;
   }catch(error){console.warn('[Kelo asset scene profile]',error);return null;}
 }
+async function completeCurrentScene(){
+ const profile=await captureAssetSceneProfile();if(!profile)throw new Error('SMART_PACK_SCENE_NOT_READY');
+ const [{completeScene},{searchExternalAssets}]=await Promise.all([import('./../creators/assets/smart-scene-packs.mjs?v=1'),import('./../creators/assets/external-asset-providers.mjs?v=15')]);
+ const pack=await completeScene({profile,search:searchExternalAssets});
+ root.KELO_SMART_SCENE_PACK=pack;try{root.localStorage?.setItem?.('kelo.asset.smart-scene-pack.v1',JSON.stringify({at:Date.now(),profile:pack.profile,wanted:pack.wanted,assetIds:pack.assets.map(a=>a.id)}));}catch{}
+ root.dispatchEvent?.(new CustomEvent('kelo:smart-scene-pack-ready',{detail:pack}));
+ if(pack.assets.length){try{root.showToast?.(`Complete Scene · ${pack.assets.length} assets compatibles`);}catch{}}
+ return pack;
+}
 function openPage(path){const opened=root.open(path,'_blank');if(!opened)root.location.href=path;try{root.KELO_LUXE?.closeMenu?.();}catch{}}
 const openSpriteOS=()=>openPage('sprite-os.html'),openLibrary=()=>{void captureAssetSceneProfile();openPage('asset-vault.html');},openPacks=()=>openPage('content-packs.html'),openCommunityCreator=()=>openPage('creator-publish.html');
 function menuButton(id,label,copy,icon,onClick,aria){const b=document.createElement('button');b.id=id;b.type='button';b.className='lx-menu-item';b.setAttribute('aria-label',aria);b.innerHTML=`<span class="lx-menu-icon" aria-hidden="true">${icon}</span><span class="lx-menu-copy"><b>${label}</b><small>${copy}</small></span>`;b.addEventListener('click',onClick);return b;}
@@ -95,7 +104,7 @@ root.addEventListener('kelo:community-player-assets',event=>{if(root.__KELO_COMM
 root.addEventListener('kelo:forest-plaza-catalog-ready',()=>void hydratePersonalContent().catch(()=>{}));
 document.addEventListener('click',event=>{if(event.target?.closest?.('#lx-create-studio,#lx-create-asset-forge'))void hydratePersonalContent().catch(()=>{});},true);
 root.addEventListener('kelo:asset-selection-changed',()=>refresh(document.getElementById(ID)));root.addEventListener('storage',()=>refresh(document.getElementById(ID)));
-const api=Object.freeze({version:'content-library-launcher-v15-persisted-swap',open:openLibrary,openSpriteOS,openPacks,openCommunityCreator,buildPersonalContent,buildPersonalPalette,previewExternalAsset,hydratePersonalAssets,hydratePersonalContent,ensureCommunityRuntime,bindCommunityNetworkBridge,refresh:()=>refresh(document.getElementById(ID))});
+const api=Object.freeze({version:'content-library-launcher-v16-smart-scene-packs',open:openLibrary,openSpriteOS,openPacks,openCommunityCreator,buildPersonalContent,buildPersonalPalette,previewExternalAsset,completeCurrentScene,hydratePersonalAssets,hydratePersonalContent,ensureCommunityRuntime,bindCommunityNetworkBridge,refresh:()=>refresh(document.getElementById(ID))});
 root.KELO_ASSET_LIBRARY_LAUNCHER=api;root.KELO_CONTENT_LIBRARY_LAUNCHER=api;
 maybeLoadLookRuntime();if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
 })(typeof globalThis!=='undefined'?globalThis:window);
