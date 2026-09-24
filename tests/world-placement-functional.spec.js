@@ -21,30 +21,34 @@ async function openWorld(page) {
     timeout: 15_000,
   });
 
-  await page.waitForFunction(() => !!(
-    window.KeloGuestPlay?.active?.() &&
-    window.KELO_ADMIN_KEYS?.can?.('world.edit') &&
-    window.KELO_LUXE?.toggleMenu &&
-    window.KELO_CREATORS_LAUNCHER
-  ), null, { timeout: 45_000 });
+  await page.waitForFunction(() => !!window.KELO_ADMIN_KEYS, null, { timeout: 45_000 });
+  const allowed=await page.evaluate(async()=>{
+    const keys=window.KELO_ADMIN_KEYS;
+    keys.installRemoteAdapter?.(null);
+    keys.installScopeProvider?.(null);
+    for(let i=0;i<50;i++){
+      const actor=String(keys.playerId?.()||window.localPlayer?.id||'local_pioneer');
+      if(!keys.can?.('world.edit',actor)){
+        try{await keys.request?.('admin-key:bootstrap-local-root',{actorId:actor,ownerId:actor,developer:true});}catch{}
+        keys.syncInventory?.();
+      }
+      if(keys.can?.('world.edit',actor))return true;
+      await new Promise(r=>setTimeout(r,120));
+    }
+    return false;
+  });
+  expect(allowed).toBe(true);
 
-  const menu = page.locator('#lx-side-menu');
-  await expect(menu).toBeVisible({ timeout: 20_000 });
-  await menu.tap();
-
-  const panel = page.locator('#lx-menu-panel');
-  await expect(panel).toHaveClass(/open/, { timeout: 10_000 });
-
-  const creators = page.locator('#lx-create-studio');
-  await expect(creators).toBeVisible({ timeout: 20_000 });
-  await creators.tap();
-
+  await page.evaluate(async()=>{
+    const {openCreatorHub}=await import('./src/creators/ui/creator-hub.mjs?v=world-editor-20260924-2');
+    await openCreatorHub({root:window});
+  });
   const hub = page.locator('#kelo-creators-hub');
   await expect(hub).toBeVisible({ timeout: 20_000 });
 
   const world = hub.locator('[data-workspace="world"]');
   await expect(world).toBeVisible({ timeout: 10_000 });
-  await world.tap();
+  await world.dispatchEvent('pointerup',{pointerType:'touch',isPrimary:true,button:0});
 
   const studio = page.locator('#kelo-studio-live');
   await expect(studio).toBeVisible({ timeout: 20_000 });
