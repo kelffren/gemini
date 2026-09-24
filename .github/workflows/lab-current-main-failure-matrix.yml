@@ -1,0 +1,48 @@
+name: LAB Current Main Failure Matrix
+
+on:
+  push:
+    branches:
+      - lab/current-main-failure-matrix-20260924
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install chromium --with-deps
+      - name: Serve
+        shell: bash
+        run: |
+          mkdir -p test-results
+          python3 -m http.server 4173 --bind 127.0.0.1 >test-results/http.log 2>&1 &
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:4173/index.html >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat test-results/http.log
+          exit 1
+      - name: Critical matrix
+        continue-on-error: true
+        env:
+          KELO_PAGES: http://127.0.0.1:4173/
+        run: npx playwright test tests/tmp-current-main-failure-matrix.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
+      - name: Studio MORE regression
+        continue-on-error: true
+        env:
+          KELO_PAGES: http://127.0.0.1:4173/
+        run: npx playwright test tests/studio-mobile-context-ui.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
+      - name: Boot stability
+        continue-on-error: true
+        env:
+          KELO_PAGES: http://127.0.0.1:4173/
+        run: npx playwright test tests/black-screen-boot.spec.js tests/main-stability-mobile.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
