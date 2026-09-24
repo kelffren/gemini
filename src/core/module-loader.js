@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.KELO_MODULE_LOADER)return;
-const VERSION='kelo-module-loader-v11-pvp-first-use';
+const VERSION='kelo-module-loader-v11.1-property-core';
 const PVP_FALLBACK=Object.freeze([
   {src:'src/abilities/abilityData.js?v=20260916-pvp-first-use-1',name:'datos habilidades PvP'},
   {src:'src/abilities/stone-system.js?v=20260916-pvp-first-use-1',name:'piedras PvP'},
@@ -34,11 +34,23 @@ const LEGACY_FALLBACK=Object.freeze({
   ]),
   pvp:PVP_FALLBACK,
   bag:Object.freeze([{src:'src/ui/backpack-fantasy-v1.css?v=1',name:'estilo mochila',type:'style'},{src:'src/systems/backpack-system.js?v=2',name:'mochila'},{src:'src/ui/backpack-ui.js?v=4',name:'mochila'}]),
-  mounts:Object.freeze([{src:'src/mounts/mount-catalog.js?v=2',name:'monturas'},{src:'src/mounts/mount-system.js?v=2',name:'monturas'},{src:'src/ui/mount-panel.js?v=2',name:'monturas'}]),
+  mounts:Object.freeze([{src:'src/stats/stat-modifier-system.js?v=1',name:'stats monturas'},{src:'src/mounts/mount-catalog.js?v=2',name:'catálogo monturas'},{src:'src/mounts/mount-equipment-catalog.js?v=2',name:'equipo monturas'},{src:'src/mounts/mount-system.js?v=2',name:'runtime monturas'},{src:'src/ui/mount-panel.js?v=2',name:'UI monturas'}]),
   market:Object.freeze([{src:'src/systems/market-escrow-system.js?v=1',name:'mercado'},{src:'src/ui/market-ui.js?v=2',name:'mercado'}]),
   titles:Object.freeze([{src:'src/systems/title-catalog.js?v=1',name:'títulos'},{src:'src/systems/player-stats.js?v=1',name:'títulos'},{src:'src/systems/title-system.js?v=1',name:'títulos'}]),
-  appearance:Object.freeze([{src:'src/characters/character-customization.js?v=1',name:'apariencia'},{src:'src/ui/character-customizer-ui.js?v=1',name:'apariencia'}]),
-  properties:Object.freeze([{src:'src/property/property-system.js?v=4',name:'propiedades'},{src:'src/ui/house-instance-ui.js?v=1',name:'propiedades'}])
+  appearance:Object.freeze([{src:'src/characters/character-slot-schema.js?v=1',name:'schema apariencia'},{src:'src/characters/character-customization.js?v=1',name:'runtime apariencia'},{src:'src/ui/character-customizer-ui.js?v=1',name:'UI apariencia'}]),
+  'property-core':Object.freeze([
+    {src:'src/property/property-asset-catalog.js?v=creator-assets-20260915-1',name:'catálogo propiedades'},
+    {src:'src/property/property-system.js?v=4',name:'runtime propiedades'}
+  ]),
+  properties:Object.freeze([
+    {src:'src/property/property-asset-catalog.js?v=creator-assets-20260915-1',name:'catálogo propiedades'},
+    {src:'src/property/property-system.js?v=4',name:'runtime propiedades'},
+    {src:'src/instances/instance-system.js?v=1',name:'instancias'},
+    {src:'src/instances/instance-runtime-bridge.js?v=1',name:'runtime instancias'},
+    {src:'src/instances/house-instance.js?v=1',name:'casas'},
+    {src:'src/instances/property-house-bridge.js?v=1',name:'puente casa-propiedad'},
+    {src:'src/ui/house-instance-ui.js?v=1',name:'UI propiedades'}
+  ])
 });
 const loaded=Object.create(null);
 const inflight=Object.create(null);
