@@ -35,6 +35,7 @@ async function openDirect(page) {
     const mod = await import('./src/creators/workspaces/world-workspace.mjs');
     const manifest = mod.createWorldWorkspaceManifest();
     const session = await manifest.open({ root: window });
+    window.__KELO_PLACEMENT_DIAG_SESSION = session;
     return !!session;
   });
   expect(result).toBe(true);
@@ -51,8 +52,7 @@ test('diagnose direct placement commit vs pointer path', async ({page}) => {
   await openDirect(page);
 
   const before = await page.evaluate(async () => {
-    const ctrl=await import('./src/studio/integration/live-studio-controller.mjs');
-    const live=ctrl.getKeloStudioLive();
+    const live=window.__KELO_PLACEMENT_DIAG_SESSION||null;
     const catalog=live?.studio?.adapter?.assetCatalog?.list?.()||[];
     const propertyCatalog=window.KELO_PROPERTY_CATALOG?.list?.()||[];
     return {
@@ -72,8 +72,7 @@ test('diagnose direct placement commit vs pointer path', async ({page}) => {
   console.log('[PLACEMENT_DIAG_BEFORE]',JSON.stringify(before));
 
   const direct = await page.evaluate(async () => {
-    const ctrl=await import('./src/studio/integration/live-studio-controller.mjs');
-    const live=ctrl.getKeloStudioLive();
+    const live=window.__KELO_PLACEMENT_DIAG_SESSION||null;
     const studio=live.studio;
     const catalog=studio.adapter.assetCatalog.list?.()||[];
     const preferred=catalog.find(x=>/tree|arbol|oak|pine|birch|nature/i.test(String(x?.id||'')+' '+String(x?.label||'')))||catalog[0];
