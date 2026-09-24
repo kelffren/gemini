@@ -223,7 +223,8 @@ function enhance(shell,root=globalThis){
   });
   const status=shell.querySelector('.ks-status');
   if(status){status.setAttribute('role','status');status.setAttribute('aria-live','polite');}
-  ensureContextBar(shell,root);
+  // TEMP DIAGNOSTIC: contextual mobile action deck disabled to isolate the World loading freeze.
+  // ensureContextBar(shell,root);
   return shell;
 }
 
