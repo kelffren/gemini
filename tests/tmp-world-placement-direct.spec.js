@@ -95,6 +95,29 @@ test('diagnose direct placement commit vs pointer path', async ({page}) => {
     out.after=studio.kernel.document.entities.length;
     out.worldEditError=window.KELO_WORLD_EDIT?.lastError||null;
     out.propertyPlacements=window.KELO_PROPERTY_SYSTEM?.getPlacements?.('parcel:world:editor')?.length??-1;
+
+    if(!out.commitOk && out.error==='PROPERTY_SYSTEM_NOT_READY'){
+      const started=performance.now();
+      while(!window.KELO_PROPERTY_SYSTEM?.ready && performance.now()-started<12000){
+        await new Promise(r=>setTimeout(r,100));
+      }
+      out.propertyReadyAfterMs=Math.round(performance.now()-started);
+      out.propertyReadyAfterWait=!!window.KELO_PROPERTY_SYSTEM?.ready;
+      if(out.propertyReadyAfterWait){
+        try{
+          live.beginPlacement(assetId);
+          studio.tools.placement.move(320,320,{snap:32});
+          const retryRow=await studio.tools.placement.commit();
+          out.retryOk=true;
+          out.retryRow=retryRow;
+        }catch(error){
+          out.retryOk=false;
+          out.retryError=String(error?.message||error);
+        }
+        out.afterRetry=studio.kernel.document.entities.length;
+        out.propertyPlacementsAfterRetry=window.KELO_PROPERTY_SYSTEM?.getPlacements?.('parcel:world:editor')?.length??-1;
+      }
+    }
     return out;
   });
   console.log('[PLACEMENT_DIAG_DIRECT]',JSON.stringify(direct));
