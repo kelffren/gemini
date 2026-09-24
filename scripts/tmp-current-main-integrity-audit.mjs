@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 const read=p=>fs.readFileSync(p,'utf8');
 const checks=[
-  ['creator hub complete',()=>{const t=read('src/creators/ui/creator-hub.mjs');return t.length>15000&&/export async function openCreatorHub/.test(t)&&/worldEditorReady/.test(t)&&/scene-kit/.test(t)}],
+  ['creator hub complete',()=>{const t=read('src/creators/ui/creator-hub.mjs');return t.length>15000&&/export (?:async )?function openCreatorHub/.test(t)&&/worldEditorReady/.test(t)&&/scene-kit/.test(t)}],
   ['asset vault complete',()=>{const t=read('asset-vault.html');return t.length>10000&&/Biblioteca Universal/.test(t)&&!/^(SEE_LOCAL|PLACEHOLDER)\s*$/.test(t.trim())}],
   ['property graph complete',()=>{const a=read('src/core/feature-registry.js'),b=read('src/core/module-loader.js'),w=read('src/creators/workspaces/world-workspace.mjs');return a.includes("'property-core'")&&a.includes("instance-system.js?v=1")&&b.includes("'property-core'")&&w.includes("loader.ensure('property-core')")}],
   ['mobile more sheet sync',()=>read('src/studio/ui/studio-mobile-ui-polish.mjs').includes('function advancedToolsOpen')],
