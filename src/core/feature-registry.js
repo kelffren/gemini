@@ -59,7 +59,7 @@ const raw={
   bag:{dependencies:[],policy:'first-use',files:[
     {src:'src/ui/backpack-fantasy-v1.css?v=1',name:'estilo mochila',type:'style'},{src:'src/systems/backpack-system.js?v=2',name:'mochila'},{src:'src/ui/backpack-ui.js?v=4',name:'mochila'}
   ]},
-  mounts:{dependencies:[],policy:'first-use',files:[{src:'src/mounts/mount-catalog.js?v=2',name:'monturas'},{src:'src/mounts/mount-system.js?v=2',name:'monturas'},{src:'src/ui/mount-panel.js?v=2',name:'monturas'}]},
+  mounts:{dependencies:[],policy:'first-use',files:[{src:'src/stats/stat-modifier-system.js?v=1',name:'stats monturas'},{src:'src/mounts/mount-catalog.js?v=2',name:'catálogo monturas'},{src:'src/mounts/mount-equipment-catalog.js?v=2',name:'equipo monturas'},{src:'src/mounts/mount-system.js?v=2',name:'runtime monturas'},{src:'src/ui/mount-panel.js?v=2',name:'UI monturas'}]},
   market:{dependencies:[],policy:'first-use',files:[{src:'src/systems/market-escrow-system.js?v=1',name:'mercado'},{src:'src/ui/market-ui.js?v=2',name:'mercado'}]},
   titles:{dependencies:[],policy:'first-use',files:[{src:'src/systems/title-catalog.js?v=1',name:'títulos'},{src:'src/systems/player-stats.js?v=1',name:'títulos'},{src:'src/systems/title-system.js?v=1',name:'títulos'}]},
   appearance:{dependencies:[],policy:'first-use',files:[{src:'src/characters/character-customization.js?v=1',name:'apariencia'},{src:'src/ui/character-customizer-ui.js?v=1',name:'apariencia'}]},
