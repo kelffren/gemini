@@ -56,16 +56,24 @@ async function captureAssetSceneProfile(){
     const mod=await import('./../studio/studio-entry.mjs');
     const studio=mod.getKeloStudioSession?.(),doc=studio?.kernel?.document;
     if(!doc)return null;
+    const entities=(doc.entities||[]).slice(0,1200),byId=new Map(entities.map(e=>[String(e.id),e]));
+    const selectedIds=studio.kernel.selection?.get?.()||studio.selection?.get?.()||[],selected=selectedIds.map(id=>byId.get(String(id))).filter(Boolean);
+    const player=root.localPlayer;const anchorEntity=selected[0]||null;
+    const anchor={x:Number(anchorEntity?.transform?.x??anchorEntity?.x??player?.x??0),y:Number(anchorEntity?.transform?.y??anchorEntity?.y??player?.y??0),source:anchorEntity?'selection':player?'player':'scene-center'};
+    const neighborhoodRadius=720;
+    const distance=e=>Math.hypot(Number(e?.transform?.x??e?.x??0)-anchor.x,Number(e?.transform?.y??e?.y??0)-anchor.y);
+    const local=entities.filter(e=>distance(e)<=neighborhoodRadius).sort((a,b)=>distance(a)-distance(b)).slice(0,96);
+    const sample=local.length>=3?local:entities.slice(0,800);
     const categories=new Map(),styles=new Map(),sizes=[];
-    for(const entity of (doc.entities||[]).slice(0,800)){
+    for(const entity of sample){
       const prefab=studio.kernel.prefabs.resolve?.(entity?.prefabId);if(!prefab)continue;
       const category=String(prefab.category||'').toLowerCase();if(category)categories.set(category,(categories.get(category)||0)+1);
       const catalog=studio.adapter?.assetCatalog?.get?.(entity.prefabId);for(const token of [catalog?.family,catalog?.category,prefab.category]){const value=String(token||'').toLowerCase();if(value)styles.set(value,(styles.get(value)||0)+1);}
-      const w=Number(prefab.bounds?.w||entity?.bounds?.w||0),h=Number(prefab.bounds?.h||entity?.bounds?.h||0);if(w>0&&h>0)sizes.push(Math.max(w,h));
+      const w=Number(prefab.bounds?.w||entity?.bounds?.w||0),h=Number(prefab.bounds?.h||entity?.bounds?.h||0),scale=Math.abs(Number(entity?.transform?.scale??entity?.scale??1))||1;if(w>0&&h>0)sizes.push(Math.max(w,h)*scale);
     }
     const sorted=map=>[...map.entries()].sort((a,b)=>b[1]-a[1]).map(x=>x[0]),orderedCategories=sorted(categories),orderedStyles=sorted(styles);
     sizes.sort((a,b)=>a-b);const targetSize=sizes.length?sizes[Math.floor(sizes.length/2)]:96;
-    const profile={version:1,worldId:doc.worldId||null,sceneName:doc.metadata?.name||'Kelo World',category:orderedCategories[0]||null,styleTags:[...new Set(['kelo-world','game-ready','top-down',...orderedStyles.slice(0,8),...(doc.metadata?.tags||[])])].slice(0,14),perspective:'top-down',environment:doc.metadata?.name||null,targetSize,entityCount:(doc.entities||[]).length,updatedAt:Date.now()};
+    const profile={version:2,worldId:doc.worldId||null,sceneName:doc.metadata?.name||'Kelo World',category:orderedCategories[0]||null,styleTags:[...new Set(['kelo-world','game-ready','top-down',...orderedStyles.slice(0,8),...(doc.metadata?.tags||[])])].slice(0,14),perspective:'top-down',environment:doc.metadata?.name||null,targetSize,entityCount:entities.length,localEntityCount:local.length,anchor,neighborhoodRadius,localCategories:orderedCategories.slice(0,5),localStyles:orderedStyles.slice(0,8),updatedAt:Date.now()};
     root.KELO_ASSET_SCENE_PROFILE=profile;root.localStorage?.setItem?.('kelo.asset.scene-profile.v1',JSON.stringify(profile));return profile;
   }catch(error){console.warn('[Kelo asset scene profile]',error);return null;}
 }
@@ -85,7 +93,7 @@ root.addEventListener('kelo:community-player-assets',event=>{if(root.__KELO_COMM
 root.addEventListener('kelo:forest-plaza-catalog-ready',()=>void hydratePersonalContent().catch(()=>{}));
 document.addEventListener('click',event=>{if(event.target?.closest?.('#lx-create-studio,#lx-create-asset-forge'))void hydratePersonalContent().catch(()=>{});},true);
 root.addEventListener('kelo:asset-selection-changed',()=>refresh(document.getElementById(ID)));root.addEventListener('storage',()=>refresh(document.getElementById(ID)));
-const api=Object.freeze({version:'content-library-launcher-v13-place-first-live-preview',open:openLibrary,openSpriteOS,openPacks,openCommunityCreator,buildPersonalContent,buildPersonalPalette,previewExternalAsset,hydratePersonalAssets,hydratePersonalContent,ensureCommunityRuntime,bindCommunityNetworkBridge,refresh:()=>refresh(document.getElementById(ID))});
+const api=Object.freeze({version:'content-library-launcher-v14-local-scene-match',open:openLibrary,openSpriteOS,openPacks,openCommunityCreator,buildPersonalContent,buildPersonalPalette,previewExternalAsset,hydratePersonalAssets,hydratePersonalContent,ensureCommunityRuntime,bindCommunityNetworkBridge,refresh:()=>refresh(document.getElementById(ID))});
 root.KELO_ASSET_LIBRARY_LAUNCHER=api;root.KELO_CONTENT_LIBRARY_LAUNCHER=api;
 maybeLoadLookRuntime();if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
 })(typeof globalThis!=='undefined'?globalThis:window);
