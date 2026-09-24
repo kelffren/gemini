@@ -130,7 +130,34 @@ export async function startPersonalAssetPalette({root=globalThis,session,assetId
   try{root.dispatchEvent?.(new CustomEvent('kelo:library-palette-ready',{detail}));root.dispatchEvent?.(new CustomEvent('kelo:semantic-brush-ready',{detail}));}catch{}
   return Object.freeze({mode:'semantic-brush',assetIds:ids,prefabIds,variants:prefabIds.length,roles,semanticPalette,tool});
 }
-export async function refreshPersonalAssetPalette({root=globalThis,session,assetIds=[],maxTemplates=24}={}){const tool=await ensureLibraryPaletteBrush(session,{root});const ids=[...new Set((assetIds||[]).map(text).filter(Boolean))].slice(0,16);for(const id of ids)await ensurePersonalVisualRegistered(root,id).catch(()=>false);const catalog=catalogFor(root,session);seedCatalogPrefabs({prefabRegistry:session.studio.kernel.prefabs,assetCatalog:catalog});const templates=[];for(const id of ids){for(const row of listPersonalBuildTemplates({root,session,assetId:id}).slice(0,3)){templates.push(row);if(templates.length>=maxTemplates)break;}if(templates.length>=maxTemplates)break;}const semanticPalette=buildSemanticPalette(templates);tool.setPalette(semanticPalette);return{tool,variants:semanticPalette.length,prefabIds:semanticPalette.map(x=>String(x.id))};}
+export async function refreshPersonalAssetPalette({root=globalThis,session,assetIds=[],maxTemplates=24}={}){
+  const tool=await ensureLibraryPaletteBrush(session,{root});
+  const ids=[...new Set((assetIds||[]).map(text).filter(Boolean))].slice(0,16);
+  for(const id of ids)await ensurePersonalVisualRegistered(root,id).catch(()=>false);
+  const catalog=catalogFor(root,session);
+  seedCatalogPrefabs({prefabRegistry:session.studio.kernel.prefabs,assetCatalog:catalog});
+  const templates=[];
+  for(const id of ids){
+    for(const row of listPersonalBuildTemplates({root,session,assetId:id}).slice(0,3)){
+      templates.push(row);
+      if(templates.length>=maxTemplates)break;
+    }
+    if(templates.length>=maxTemplates)break;
+  }
+  const semanticPalette=buildSemanticPalette(templates);
+  if(semanticPalette.length<2){
+    const current=tool.getPalette?.()||[];
+    return{
+      tool,
+      variants:current.length,
+      prefabIds:current.map(x=>String(x.id)),
+      unchanged:true,
+      reason:semanticPalette.length?'INSUFFICIENT_VARIANTS':'NO_VARIANTS'
+    };
+  }
+  tool.setPalette(semanticPalette);
+  return{tool,variants:semanticPalette.length,prefabIds:semanticPalette.map(x=>String(x.id)),unchanged:false};
+}
 
 export async function startPersonalAssetPlacement({root=globalThis,session,assetId,templateId=null,prepareScenePainter=true}={}){
   const id=text(assetId);if(!id)throw new Error('LIBRARY_BUILD_ASSET_ID_REQUIRED');
