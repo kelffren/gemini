@@ -24,6 +24,7 @@ import {createSemanticContextResolver} from './semantic-context-resolver.mjs';
 const INPUT_CONTEXT='studio-library-palette-brush';
 const MAX_PALETTE=24;
 const MAX_PREVIEW=180;
+const RECENT_VARIANTS=5;
 const DENSITY_STEPS=Object.freeze([.65,1,1.35,1.75,2.2]);
 const RADIUS_STEPS=Object.freeze([24,56,96,144,208]);
 const DEFAULT_BLOCKED_ZONE_TAGS=Object.freeze(['no-build','keep-clear','spawn-clear']);
@@ -85,7 +86,7 @@ function normalizeSettings(input={}){
 
 export function createLibraryPaletteBrushTool(kernel,{root=globalThis}={}){
   if(!kernel)throw new Error('STUDIO_LIBRARY_PALETTE_KERNEL_REQUIRED');
-  let palette=[],settings=normalizeSettings(),active=false,stroke=null,committing=false,unregisterInput=null;
+  let palette=[],settings=normalizeSettings(),active=false,stroke=null,committing=false,unregisterInput=null,recentVariants=[];
   let panel=null,bodyObserver=null,keyHandler=null,destroyed=false;
   const listeners=new Set(),EMPTY=Object.freeze([]);
 
@@ -128,10 +129,12 @@ export function createLibraryPaletteBrushTool(kernel,{root=globalThis}={}){
   function cycleDensity(){settings=normalizeSettings({...settings,density:nextStep(settings.density,DENSITY_STEPS)});stroke=null;emit();return settings.density;}
   function cycleRadius(){settings=normalizeSettings({...settings,radius:nextStep(settings.radius,RADIUS_STEPS)});stroke=null;emit();return settings.radius;}
   function toggleSmartContext(){settings=normalizeSettings({...settings,smartContext:!settings.smartContext});stroke=null;emit();notify(`Reglas ${settings.smartContext?'ON':'OFF'}`);return settings.smartContext;}
+  function repetitionPenalty(item){const id=String(item?.id||'');if(!id)return 1;const last=recentVariants.lastIndexOf(id);if(last<0)return 1;const age=recentVariants.length-1-last;return age===0?.08:age===1?.28:age===2?.52:.78;}
+  function rememberVariant(id){id=String(id||'');if(!id)return;recentVariants.push(id);if(recentVariants.length>RECENT_VARIANTS)recentVariants.splice(0,recentVariants.length-RECENT_VARIANTS);}
   function weightedItem(h,context=null){
     let total=0;const weighted=[];
     for(const item of palette){
-      const semanticWeight=applySemanticPreset(item,settings.semanticPreset),contextWeight=stroke?.contextResolver?.roleWeightMultiplier?.(item.role,context)??1,weight=semanticWeight*contextWeight;
+      const semanticWeight=applySemanticPreset(item,settings.semanticPreset),contextWeight=stroke?.contextResolver?.roleWeightMultiplier?.(item.role,context)??1,weight=semanticWeight*contextWeight*repetitionPenalty(item);
       if(!(weight>0))continue;
       weighted.push([item,weight]);total+=weight;
     }
@@ -211,6 +214,7 @@ export function createLibraryPaletteBrushTool(kernel,{root=globalThis}={}){
     const reason=constraintReason(rect,item,stroke.rows);
     if(reason){stroke.rejected[reason]=(stroke.rejected[reason]||0)+1;return false;}
     stroke.cells.add(cell);
+    rememberVariant(item.id);
     stroke.rows.push({
       id:newId(),prefabId:item.id,
       transform:{x:chosen.x,y:chosen.y,rotation:chosen.rotation,scale:chosen.scale},
@@ -272,7 +276,7 @@ export function createLibraryPaletteBrushTool(kernel,{root=globalThis}={}){
     try{root.KELO_LIBRARY_PALETTE_ACTIVE=false;root.KELO_SEMANTIC_BRUSH_ACTIVE=false;}catch{}
     emit();return false;
   }
-  function remix(){settings=normalizeSettings({...settings,seed:settings.seed+1});stroke=null;emit();notify(`Seed #${settings.seed}`);return settings.seed;}
+  function remix(){settings=normalizeSettings({...settings,seed:settings.seed+1});stroke=null;recentVariants=[];emit();notify(`Seed #${settings.seed}`);return settings.seed;}
 
   function css(doc){
     if(doc.getElementById('kelo-library-palette-style'))return;
@@ -332,7 +336,7 @@ export function createLibraryPaletteBrushTool(kernel,{root=globalThis}={}){
     id:'libraryPaletteBrush',
     configurePalette,configure,setSemanticPreset,cycleSemanticPreset,cycleDensity,cycleRadius,toggleSmartContext,start,stop,remix,
     beginAt,strokeTo,commit,cancelStroke,state,destroy,
-    getPalette:()=>palette.map(copy),
+    getPalette:()=>palette.map(copy),setPalette(entries){const next=resolvePalette(entries);if(next.length<2)throw new Error('STUDIO_LIBRARY_PALETTE_NEEDS_TWO');palette=next;recentVariants=[];stroke=null;emit();return state();},
     getPreviewRefs:()=>stroke?.rows||EMPTY,
     getPreviews:()=>stroke?.rows.map(copy)||[],
     onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);}
