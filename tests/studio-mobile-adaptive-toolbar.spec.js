@@ -38,6 +38,8 @@ async function installFixture(page,{selectionCount=0,keepFavorites=false}={}){
     document.body.append(shell);
     const polish=await import('./src/studio/ui/studio-mobile-ui-polish.mjs?v=adaptive-toolbar-polish-test-1');
     window.__toolbarPolish=polish.installStudioMobileUiPolish({root:window});window.__toolbarPolish.refresh();
+    const sheet=await import('./src/studio/ui/studio-mobile-tools-sheet.mjs?v=adaptive-toolbar-sheet-test-1');
+    window.__adaptiveToolsSheet=sheet.installStudioMobileToolsSheet({root:window});window.__adaptiveToolsSheet.refresh();
     const adaptive=await import('./src/studio/ui/studio-mobile-adaptive-toolbar.mjs?v=adaptive-toolbar-test-1');
     window.__adaptiveToolbar=adaptive.installStudioMobileAdaptiveToolbar({root:window});window.__adaptiveToolbar.refresh();
   },{count:selectionCount,keep:keepFavorites});
@@ -48,7 +50,10 @@ test('canvas starts with familiar defaults and promotes recently used tools',asy
   const bar=page.locator('.ks-mobile-context-actions');
   await expect(bar.locator('button')).toHaveText(['SELECT','EDIT','UNDO','GROUND','MÁS']);
 
-  await page.locator('.ks-deck [data-mode="path"]').click();
+  await bar.getByRole('button',{name:'Mostrar herramientas avanzadas'}).click();
+  const sheet=page.locator('.ks-tools-sheet');
+  await sheet.getByRole('tab',{name:'TERRENO'}).click();
+  await sheet.locator('[data-kelo-tool-proxy="mode:path"]').click();
   await expect(bar.locator('button')).toHaveText(['SELECT','ROAD','EDIT','UNDO','MÁS']);
   const heights=await bar.locator('button').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().height));
   expect(heights.every(height=>height>=44)).toBe(true);
@@ -57,7 +62,10 @@ test('canvas starts with familiar defaults and promotes recently used tools',asy
 test('long press pins a tool and pinned favorite outranks later recents',async({page})=>{
   await installFixture(page);
   const bar=page.locator('.ks-mobile-context-actions');
-  await page.locator('.ks-deck [data-mode="path"]').click();
+  await bar.getByRole('button',{name:'Mostrar herramientas avanzadas'}).click();
+  const sheet=page.locator('.ks-tools-sheet');
+  await sheet.getByRole('tab',{name:'TERRENO'}).click();
+  await sheet.locator('[data-kelo-tool-proxy="mode:path"]').click();
   const road=bar.getByRole('button',{name:/ROAD/});
   await road.dispatchEvent('pointerdown',{pointerId:31,pointerType:'touch',isPrimary:true,button:0});
   await page.waitForTimeout(620);
@@ -65,7 +73,9 @@ test('long press pins a tool and pinned favorite outranks later recents',async({
   await expect(bar.locator('[data-kelo-proxy="mode:path"]')).toHaveAttribute('data-kelo-pinned','1');
   expect(await page.evaluate(()=>window.__adaptiveToolbar.favorites())).toContain('mode:path');
 
-  await page.locator('.ks-deck [data-mode="collision"]').click();
+  await bar.getByRole('button',{name:'Mostrar herramientas avanzadas'}).click();
+  await page.locator('.ks-tools-sheet').getByRole('tab',{name:'TERRENO'}).click();
+  await page.locator('.ks-tools-sheet [data-kelo-tool-proxy="mode:collision"]').click();
   await expect(bar.locator('button').nth(1)).toHaveText('ROAD');
   await expect(bar.locator('button').nth(2)).toHaveText('COLLISION');
 });
@@ -75,7 +85,10 @@ test('selection context preserves SELECT BORRAR and MAS while adapting only safe
   const bar=page.locator('.ks-mobile-context-actions');
   await expect(bar.locator('button')).toHaveText(['SELECT','ROTAR','DUPLICAR','BORRAR','MÁS']);
 
-  await page.locator('.ks-deck [data-act="scale-up"]').click();
+  await bar.getByRole('button',{name:'Mostrar herramientas avanzadas'}).click();
+  const sheet=page.locator('.ks-tools-sheet');
+  await sheet.getByRole('tab',{name:'TRANSFORMAR'}).click();
+  await sheet.locator('[data-kelo-tool-proxy="act:scale-up"]').click();
   await expect(bar.locator('button')).toHaveText(['SELECT','ESCALA+','ROTAR','BORRAR','MÁS']);
   await expect(bar.getByRole('button',{name:'BORRAR'})).toHaveAttribute('data-kelo-danger','1');
 });
