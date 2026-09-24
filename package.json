@@ -116,7 +116,9 @@
     "evolution:map-forge": "node scripts/map-forge-evolution-autopilot.mjs",
     "audit:library-build": "node scripts/library-build-flow-audit.mjs",
     "audit:pvp-auto-reducer": "node scripts/pvp-auto-reducer-audit.mjs",
-    "audit:semantic-context": "node scripts/semantic-context-audit.mjs"
+    "audit:semantic-context": "node scripts/semantic-context-audit.mjs",
+    "test:asset-live-telemetry": "node --test tests/live-asset-telemetry.test.mjs",
+    "test:asset-live-qa": "playwright test tests/live-asset-qa-telemetry.spec.js"
   },
   "devDependencies": {
     "@cyclonedx/cyclonedx-npm": "6.0.1",
