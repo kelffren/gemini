@@ -1,0 +1,56 @@
+name: TEMP Audit Bundle Regression
+
+on:
+  push:
+    branches:
+      - fix/audit-bundle-current-main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      KELO_PAGES: http://127.0.0.1:4173/
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install chromium --with-deps
+      - name: Serve
+        shell: bash
+        run: |
+          mkdir -p test-results
+          python3 -m http.server 4173 --bind 127.0.0.1 >test-results/http.log 2>&1 &
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:4173/index.html >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Critical bundle tests
+        run: npx playwright test tests/tmp-audit-bundle.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
+      - name: Studio MORE suite
+        run: npx playwright test tests/studio-mobile-context-ui.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
+      - name: World editor regression suite
+        run: >-
+          npx playwright test
+          tests/world-editor-live-open.spec.js
+          tests/world-editor-ios-reopen.spec.js
+          tests/iphone-world-visible-flow.spec.js
+          tests/world-placement-functional.spec.js
+          --project=chromium --workers=1 --retries=0 --reporter=list
+      - name: Boot and movement stability
+        run: npx playwright test tests/black-screen-boot.spec.js tests/main-stability-mobile.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-bundle-evidence
+          if-no-files-found: ignore
+          retention-days: 14
+          path: test-results/**
