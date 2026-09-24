@@ -11,6 +11,7 @@ import { bootKeloCreators } from '../creator-entry.mjs?v=world-editor-20260924-2
 let active=null;
 let openingPromise=null;
 const GLOBAL_HUB_KEY='__KELO_CREATOR_HUB_SINGLETON_V1__';
+const HUB_MODULE_URL=import.meta.url;
 const GLOBAL_OPEN_KEY='__KELO_CREATOR_HUB_OPENING_V1__';
 
 const CATALOG=Object.freeze([
@@ -87,6 +88,10 @@ async function openCreatorHubImpl({root=globalThis}={}){
   doc.head.append(style);
 
   const hub=make('section',{id:'kelo-creators-hub'});
+  const hubSeq=Number(root.__KELO_CREATOR_HUB_SEQ__||0)+1;
+  try{root.__KELO_CREATOR_HUB_SEQ__=hubSeq;}catch{}
+  hub.dataset.keloHubSeq=String(hubSeq);
+  hub.dataset.keloHubModule=HUB_MODULE_URL;
   hub.setAttribute('data-kelo-creators-ui','');
   hub.setAttribute('role','dialog');
   hub.setAttribute('aria-modal','true');
