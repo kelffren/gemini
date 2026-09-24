@@ -116,7 +116,14 @@
     "evolution:map-forge": "node scripts/map-forge-evolution-autopilot.mjs",
     "audit:library-build": "node scripts/library-build-flow-audit.mjs",
     "audit:pvp-auto-reducer": "node scripts/pvp-auto-reducer-audit.mjs",
-    "audit:semantic-context": "node scripts/semantic-context-audit.mjs"
+    "audit:semantic-context": "node scripts/semantic-context-audit.mjs",
+    "context:build": "node scripts/ai-context-compiler.mjs",
+    "audit:ai-context": "node scripts/ai-context-audit.mjs",
+    "context:ask": "node scripts/ai-context-query.mjs",
+    "context:history": "node scripts/ai-context-history.mjs",
+    "context:refresh": "npm run context:build && npm run audit:ai-context && npm run audit:system-health",
+    "context:health": "node scripts/ai-context-health.mjs",
+    "audit:system-health": "node scripts/system-health-audit.mjs"
   },
   "devDependencies": {
     "@cyclonedx/cyclonedx-npm": "6.0.1",
