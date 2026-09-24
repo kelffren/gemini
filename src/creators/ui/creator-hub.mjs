@@ -9,6 +9,7 @@
 import { bootKeloCreators } from '../creator-entry.mjs?v=world-editor-20260924-2';
 
 let active=null;
+let openingPromise=null;
 
 const CATALOG=Object.freeze([
   {category:'BUILD',items:[['world','World','active'],['map-forge','Map Forge','active'],['parcel','Parcel','active'],['dungeon','Dungeon','active'],['game-mode','Game Mode','active']]},
@@ -60,7 +61,7 @@ function make(tag,props={},children=[]){
   return el;
 }
 
-export async function openCreatorHub({root=globalThis}={}){
+async function openCreatorHubImpl({root=globalThis}={}){
   if(active?.hub?.isConnected)return active;
   if(!root.document)throw new Error('CREATOR_HUB_DOM_REQUIRED');
 
@@ -414,6 +415,15 @@ export async function openCreatorHub({root=globalThis}={}){
   await render('create');
   clearStaleStudioChrome();
   return active;
+}
+
+export function openCreatorHub(options={}){
+  if(active?.hub?.isConnected)return Promise.resolve(active);
+  if(openingPromise)return openingPromise;
+  openingPromise=Promise.resolve()
+    .then(()=>openCreatorHubImpl(options))
+    .finally(()=>{openingPromise=null;});
+  return openingPromise;
 }
 
 export function closeCreatorHub(){active?.close?.();}
