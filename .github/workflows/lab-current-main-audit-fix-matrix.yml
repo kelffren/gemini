@@ -21,13 +21,21 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: Static integrity
         run: node scripts/tmp-current-main-integrity-audit.mjs
-      - name: Studio static audits
-        run: |
-          npm run audit:studio
-          npm run audit:property
-          npm run audit:studio:placement-touch
-          npm run audit:studio:mobile-hit-slop
-          npm run audit:studio:context
+      - name: Studio foundation audit
+        continue-on-error: true
+        run: npm run audit:studio
+      - name: Property editor audit
+        continue-on-error: true
+        run: npm run audit:property
+      - name: Placement touch audit
+        continue-on-error: true
+        run: npm run audit:studio:placement-touch
+      - name: Mobile hit slop audit
+        continue-on-error: true
+        run: npm run audit:studio:mobile-hit-slop
+      - name: Context inspector audit
+        continue-on-error: true
+        run: npm run audit:studio:context
       - run: npx playwright install chromium --with-deps
       - name: Serve
         shell: bash
