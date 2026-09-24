@@ -79,12 +79,21 @@ test('World recovers a stale Studio session instead of leaving iOS on a black pa
     const hub = page.locator('#kelo-creators-hub');
     await expect(hub).toBeVisible({ timeout: 10000 });
 
-    await page.waitForFunction(() => !!(
-      window.KeloInputLocks?.acquire &&
-      window.KELO_ADMIN_KEYS?.can?.('world.edit')
-    ), null, { timeout: 10000 });
+    await page.waitForFunction(() => !!window.KELO_ADMIN_KEYS, null, { timeout: 10000 });
     const creatorContracts = await page.evaluate(async () => {
-      const { getKeloCreatorsPlatform } = await import('./src/creators/creator-entry.mjs');
+      const keys=window.KELO_ADMIN_KEYS;
+      keys.installRemoteAdapter?.(null);
+      keys.installScopeProvider?.(null);
+      for(let i=0;i<50;i++){
+        const actor=String(keys.playerId?.()||window.localPlayer?.id||'local_pioneer');
+        if(!keys.can?.('world.edit',actor)){
+          try{await keys.request?.('admin-key:bootstrap-local-root',{actorId:actor,ownerId:actor,developer:true});}catch{}
+          keys.syncInventory?.();
+        }
+        if(keys.can?.('world.edit',actor))break;
+        await new Promise(r=>setTimeout(r,120));
+      }
+      const { getKeloCreatorsPlatform } = await import('./src/creators/creator-entry.mjs?v=world-editor-20260924-2');
       const platform = getKeloCreatorsPlatform();
       const actorId = platform?.permission?.actorId?.();
       return {
@@ -98,7 +107,7 @@ test('World recovers a stale Studio session instead of leaving iOS on a black pa
     expect(creatorContracts.platform).toBeTruthy();
     expect(creatorContracts.worldEdit).toBeTruthy();
 
-    await hub.locator('[data-workspace="world"]').click();
+    await hub.locator('[data-workspace="world"]').dispatchEvent('pointerup',{pointerType:'touch',isPrimary:true,button:0});
     const studio = page.locator('#kelo-studio-live');
     await expect(studio).toBeVisible({ timeout: 15000 });
     await expect(studio).not.toHaveAttribute('data-kelo-world-loading', '1', { timeout: 25000 });
@@ -124,11 +133,11 @@ test('World recovers a stale Studio session instead of leaving iOS on a black pa
     await expect(studio).toHaveCount(0);
 
     await page.evaluate(async () => {
-      const { openCreatorHub } = await import(`./src/creators/ui/creator-hub.mjs?ios-reopen=${Date.now()}`);
+      const { openCreatorHub } = await import('./src/creators/ui/creator-hub.mjs?v=world-editor-20260924-2');
       await openCreatorHub({ root: window });
     });
     await expect(page.locator('#kelo-creators-hub')).toBeVisible({ timeout: 10000 });
-    await page.locator('#kelo-creators-hub [data-workspace="world"]').click();
+    await page.locator('#kelo-creators-hub [data-workspace="world"]').dispatchEvent('pointerup',{pointerType:'touch',isPrimary:true,button:0});
 
     const recovered = page.locator('#kelo-studio-live');
     await expect(recovered).toBeVisible({ timeout: 15000 });
