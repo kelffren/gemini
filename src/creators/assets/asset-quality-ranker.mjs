@@ -1,0 +1,63 @@
+/* KELO-INDEX
+ * area: CREATORS / ASSET INTELLIGENCE
+ * owner: Kelo Universal Content Bridge
+ * keys: QUALITY RANKING TASTE SCENE MATCH DEDUPE EXPLAINABLE METADATA-ONLY MOBILE
+ * purpose: rank external catalog metadata without downloading original binaries.
+ */
+
+const STORAGE_KEY='kelo.asset.taste.v1';
+const VERSION='asset-intelligence-v1';
+const DEFAULT_WEIGHTS=Object.freeze({visualQuality:.30,keloWorldCompatibility:.25,searchRelevance:.20,technicalQuality:.15,sourceConfidence:.10});
+const KNOWN_GOOD_PROVIDERS=new Set(['kelo-content','kenney','lpc','opengameart','spritecook','ambientcg','polyhaven','quaternius']);
+const VISUAL_KINDS=new Set(['image','sprite','tileset','animation','vfx','texture']);
+const SUPPORTED_KINDS=new Set(['image','sprite','tileset','animation','vfx','texture','model','sfx','music','ambience','ability','scene','prefab']);
+const PREFERRED_STYLE=new Set(['fantasy','rpg','medieval','imperial','ornate','detailed','isometric','top-down','topdown','pixel-art','game-ready','transparent']);
+const BAD_HINTS=/\b(placeholder|mockup|sample|test|debug|draft|broken|deprecated|low[- ]?res|thumbnail[- ]?only)\b/i;
+const HEAVY_HINTS=/\b(8k|16k|raw|source|psd|blend|project files?)\b/i;
+const TRANSPARENT_HINTS=/\b(alpha|transparent|png|sprite|cutout)\b/i;
+
+const clamp=(v,min=0,max=100)=>Math.max(min,Math.min(max,Number.isFinite(Number(v))?Number(v):0));
+const clean=v=>String(v??'').trim();
+const lower=v=>clean(v).toLowerCase();
+const words=v=>lower(v).split(/[^a-z0-9áéíóúñü]+/i).filter(Boolean);
+const uniq=list=>[...new Set((list||[]).map(lower).filter(Boolean))];
+function safeStore(){try{return globalThis.localStorage||null;}catch{return null;}}
+function dimensions(asset){const d=asset?.dimensions||{};const width=Number(asset?.width||d.width||d.w||0),height=Number(asset?.height||d.height||d.h||0);return{width,height,pixels:Math.max(0,width)*Math.max(0,height)};}
+function assetText(asset){return `${asset?.name||''} ${asset?.category||''} ${asset?.contentKind||''} ${(asset?.tags||[]).join(' ')} ${asset?.description||''} ${asset?.author||''}`.trim();}
+function features(asset){const tags=uniq([...(asset?.tags||[]),asset?.category,asset?.contentKind,asset?.provider]);return{tags,provider:lower(asset?.provider),category:lower(asset?.category),kind:lower(asset?.contentKind),license:lower(asset?.license)};}
+function normalizedName(asset){return lower(asset?.name||asset?.externalId||asset?.id).replace(/\b(v(?:er(?:sion)?)?\s*\d+|variant\s*\d+|copy\s*\d+|\d{1,3})\b/g,' ').replace(/[^a-z0-9]+/g,' ').trim();}
+function basename(url=''){try{return new URL(url,globalThis.location?.href||'https://kelo.invalid/').pathname.split('/').pop()?.replace(/[-_.]?\d+x\d+/g,'')||'';}catch{return clean(url).split('/').pop()||'';}}
+function dedupeKey(asset){const {width,height}=dimensions(asset);return `${normalizedName(asset)}|${lower(asset?.category)}|${Math.round(width/16)}x${Math.round(height/16)}|${lower(basename(asset?.previewUrl||asset?.downloadUrl||''))}`;}
+
+export function getTasteProfile(){const fallback={version:1,updatedAt:0,assets:{},features:{}};try{const raw=safeStore()?.getItem(STORAGE_KEY);if(!raw)return fallback;const parsed=JSON.parse(raw);return{...fallback,...parsed,assets:parsed?.assets||{},features:parsed?.features||{}};}catch{return fallback;}}
+function saveTasteProfile(profile){try{safeStore()?.setItem(STORAGE_KEY,JSON.stringify(profile));}catch{}return profile;}
+function featureDelta(action){return action==='favorite'?3:action==='like'?1:action==='reject'?-3:0;}
+export function recordAssetFeedback(asset,action){
+  if(!asset?.id||!['like','reject','favorite','clear'].includes(action))return getTasteProfile();
+  const profile=getTasteProfile(),id=String(asset.id),prev=profile.assets[id]?.action||null;
+  const apply=(act,mult=1)=>{const d=featureDelta(act)*mult;if(!d)return;for(const feature of features(asset).tags){const row=profile.features[feature]||{score:0,likes:0,rejects:0,favorites:0};row.score=clamp((Number(row.score)||0)+d,-24,24);if(act==='like')row.likes=Math.max(0,(row.likes||0)+mult);if(act==='reject')row.rejects=Math.max(0,(row.rejects||0)+mult);if(act==='favorite')row.favorites=Math.max(0,(row.favorites||0)+mult);profile.features[feature]=row;}};
+  if(prev)apply(prev,-1);
+  if(action==='clear')delete profile.assets[id];else{profile.assets[id]={action,at:Date.now(),provider:asset.provider||null,category:asset.category||null};apply(action,1);}
+  profile.updatedAt=Date.now();saveTasteProfile(profile);
+  try{globalThis.dispatchEvent?.(new CustomEvent('kelo:asset-taste-feedback',{detail:{assetId:id,action,profile}}));}catch{}
+  return profile;
+}
+export function clearTasteProfile(){const profile={version:1,updatedAt:Date.now(),assets:{},features:{}};return saveTasteProfile(profile);}
+
+function searchScore(asset,query){const q=words(query);if(!q.length)return 72;const name=lower(asset?.name),hay=lower(assetText(asset));let hit=0,nameHit=0;for(const token of q){if(hay.includes(token))hit++;if(name.includes(token))nameHit++;}const coverage=hit/q.length,exact=name.includes(lower(query))?1:0;return clamp(30+coverage*45+(nameHit/q.length)*15+exact*10);}
+function visualScore(asset){if(!VISUAL_KINDS.has(lower(asset?.contentKind)))return 72;const text=assetText(asset),{width,height,pixels}=dimensions(asset);let score=58;if(asset.previewUrl)score+=9;if(TRANSPARENT_HINTS.test(text)||/image\/(png|webp)/i.test(asset?.mime||''))score+=7;if(width&&height){const short=Math.min(width,height),long=Math.max(width,height);if(short>=128)score+=7;if(short>=256)score+=5;if(long>8192)score-=8;if(short<32)score-=20;if(pixels>0&&pixels<4096)score-=12;const ratio=long/Math.max(1,short);if(ratio>8)score-=8;}if(BAD_HINTS.test(text))score-=26;if(asset.verified)score+=4;if(asset.packId||asset.pack||asset.variants?.length)score+=4;return clamp(score);}
+function keloScore(asset){const f=features(asset),text=lower(assetText(asset));let score=SUPPORTED_KINDS.has(f.kind)?64:34;if(['sprite','tileset','image','animation','vfx'].includes(f.kind))score+=8;for(const tag of PREFERRED_STYLE)if(text.includes(tag))score+=2.5;if(/imperial|fantasy|rpg|medieval|ornate|luxury/.test(text))score+=8;if(/photoreal|photo|corporate|stock photo/.test(text)&&['sprite','tileset'].includes(f.kind))score-=14;if(Number(asset?.bytes)>6_000_000)score-=8;if(Number(asset?.bytes)>20_000_000)score-=12;return clamp(score);}
+function technicalScore(asset){let score=52;const kind=lower(asset?.contentKind),bytes=Number(asset?.bytes||0),mime=lower(asset?.mime);if(asset.previewUrl)score+=10;if(asset.downloadUrl||asset.inlineManifest)score+=8;if(asset.sourceUrl)score+=4;if(asset.verified)score+=5;if(asset.catalogOnly)score-=6;if(bytes){if(bytes<2_000_000)score+=8;else if(bytes>12_000_000)score-=10;else if(bytes>5_000_000)score-=4;}if(mime&&/image\/(png|webp|jpeg)|audio\//.test(mime))score+=5;if(HEAVY_HINTS.test(assetText(asset)))score-=12;if(VISUAL_KINDS.has(kind)&&!asset.previewUrl)score-=24;return clamp(score);}
+function upperLicense(v){return clean(v).toUpperCase();}
+function sourceScore(asset){let score=48;if(asset.verified)score+=18;if(KNOWN_GOOD_PROVIDERS.has(lower(asset?.provider)))score+=12;const license=upperLicense(asset?.license);if(/^(CC0|CC-BY|OGA-BY|KELO)/.test(license))score+=12;else if(!license||license==='UNKNOWN')score-=12;if(asset.sourceUrl)score+=5;if(asset.author)score+=3;return clamp(score);}
+function tasteScore(asset,profile=getTasteProfile()){const direct=profile.assets?.[String(asset?.id)]?.action;if(direct==='favorite')return 100;if(direct==='like')return 88;if(direct==='reject')return 0;const list=features(asset).tags;if(!list.length)return 50;let sum=0,n=0;for(const feature of list){const row=profile.features?.[feature];if(!row)continue;sum+=Number(row.score)||0;n++;}if(!n)return 50;return clamp(50+(sum/n)*3.2);}
+function sceneScore(asset,sceneProfile){if(!sceneProfile)return 50;const wanted=uniq([...(sceneProfile.styleTags||[]),sceneProfile.category,sceneProfile.contentKind,sceneProfile.perspective,sceneProfile.environment]);if(!wanted.length)return 50;const have=uniq([...features(asset).tags,...words(assetText(asset))]);const set=new Set(have);let hits=0;for(const token of wanted)if(set.has(token)||have.some(x=>x.includes(token)||token.includes(x)))hits++;let score=38+(hits/wanted.length)*52;const dims=dimensions(asset),target=Number(sceneProfile.targetSize||0);if(target&&dims.width){const ratio=Math.max(target,dims.width)/Math.max(1,Math.min(target,dims.width));if(ratio<2)score+=8;else if(ratio>5)score-=10;}return clamp(score);}
+function normalizeWeights(weights={}){const merged={...DEFAULT_WEIGHTS,...weights};let sum=Object.values(merged).reduce((n,v)=>n+Math.max(0,Number(v)||0),0)||1;for(const key of Object.keys(merged))merged[key]=Math.max(0,Number(merged[key])||0)/sum;return merged;}
+function hardRejectReason(asset){if(!asset?.id)return'missing-id';const kind=lower(asset.contentKind);if(VISUAL_KINDS.has(kind)&&!asset.previewUrl&&!asset.downloadUrl)return'no-visual-source';if(asset.previewUrl&&/^javascript:/i.test(clean(asset.previewUrl)))return'unsafe-preview-url';if(asset.downloadUrl&&/^javascript:/i.test(clean(asset.downloadUrl)))return'unsafe-download-url';return null;}
+function reasonsFor(asset,scores){const out=[];if(scores.sceneMatch>=78)out.push('High scene compatibility');if(scores.searchRelevance>=88)out.push('Strong search match');if(scores.visualQuality>=78)out.push('Good visual quality');if(scores.technicalQuality>=78)out.push('Mobile-friendly technical fit');if(scores.sourceConfidence>=80)out.push('Trusted source metadata');if(scores.taste>=72)out.push('Preferred style');if(TRANSPARENT_HINTS.test(assetText(asset)))out.push('Transparency-friendly');if(asset.verified)out.push('Verified provider');return out.slice(0,4);}
+function annotate(asset,{query='',sceneProfile=null,weights=DEFAULT_WEIGHTS,profile=getTasteProfile()}={}){const breakdown={visualQuality:visualScore(asset),keloWorldCompatibility:keloScore(asset),searchRelevance:searchScore(asset,query),technicalQuality:technicalScore(asset),sourceConfidence:sourceScore(asset)};const sceneMatch=sceneScore(asset,sceneProfile),taste=tasteScore(asset,profile),w=normalizeWeights(weights);let base=0;for(const [key,weight] of Object.entries(w))base+=(breakdown[key]||0)*weight;const tasteModifier=(taste-50)*.16,sceneModifier=(sceneMatch-50)*.14,direct=profile.assets?.[String(asset.id)]?.action;let finalScore=clamp(base+tasteModifier+sceneModifier);if(direct==='reject')finalScore=Math.min(finalScore,18);if(direct==='favorite')finalScore=Math.max(finalScore,92);const scores={...breakdown,sceneMatch,taste,finalScore:Math.round(finalScore)};return{...asset,qualityScore:Math.round((breakdown.visualQuality+breakdown.technicalQuality)/2),sceneMatchScore:Math.round(sceneMatch),tasteScore:Math.round(taste),finalScore:Math.round(finalScore),scoreBreakdown:Object.freeze({...breakdown,sceneMatch,taste}),scoreReasons:Object.freeze(reasonsFor(asset,scores)),rankTier:finalScore>=78?'best':finalScore>=62?'good':'all',rankingVersion:VERSION};}
+
+export function rankAssets(assets=[],options={}){const profile=options.tasteProfile||getTasteProfile(),ranked=[];for(const asset of Array.isArray(assets)?assets:[]){const reason=hardRejectReason(asset);if(reason){if(options.includeRejected===true)ranked.push({...asset,hardRejected:true,hardRejectReason:reason,finalScore:0,rankTier:'all'});continue;}ranked.push(annotate(asset,{...options,profile}));}ranked.sort((a,b)=>(b.finalScore-a.finalScore)||Number(b.verified===true)-Number(a.verified===true)||String(a.name||'').localeCompare(String(b.name||'')));const deduped=[],seen=new Map();for(const asset of ranked){const key=dedupeKey(asset);if(!key||key.startsWith('|||')){deduped.push(asset);continue;}const previous=seen.get(key);if(!previous){seen.set(key,asset);deduped.push(asset);continue;}if(asset.finalScore>previous.finalScore){const i=deduped.indexOf(previous);if(i>=0)deduped[i]=asset;seen.set(key,asset);}}deduped.sort((a,b)=>(b.finalScore-a.finalScore)||String(a.name||'').localeCompare(String(b.name||'')));return deduped;}
+export function explainAssetScore(asset){return{score:Number(asset?.finalScore)||0,tier:asset?.rankTier||'all',reasons:[...(asset?.scoreReasons||[])],breakdown:{...(asset?.scoreBreakdown||{})},version:asset?.rankingVersion||VERSION};}
+export const ASSET_QUALITY_RANKER=Object.freeze({version:VERSION,weights:DEFAULT_WEIGHTS,rankAssets,explainAssetScore,getTasteProfile,recordAssetFeedback,clearTasteProfile});
+if(typeof window!=='undefined')window.KELO_ASSET_QUALITY_RANKER=ASSET_QUALITY_RANKER;
