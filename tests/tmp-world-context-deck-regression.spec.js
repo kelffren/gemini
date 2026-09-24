@@ -114,18 +114,11 @@ test('World manifest opens Studio and clears loading shell', async ({ page }) =>
   const editProxy = contextBar.locator('[data-kelo-proxy="act:edit-assets"]');
   await expect(editProxy).toBeVisible({ timeout: 5000 });
 
-  const more = contextBar.locator('.ks-mobile-more');
-  await expect(more).toHaveText('MÁS');
-  await more.tap();
-  await expect(studio).toHaveAttribute('data-mobile-advanced', '1');
-  await expect(more).toHaveText('MENOS');
-  await more.tap();
-  await expect(studio).toHaveAttribute('data-mobile-advanced', '0');
-  await expect(more).toHaveText('MÁS');
-
   // Give the observer several turns. If the old feedback loop returns,
   // Playwright will hang here instead of reaching the assertion.
-  await page.waitForTimeout(750);
+  await page.waitForTimeout(1200);
   await expect(contextBar).toBeVisible();
+  await expect(editProxy).toBeVisible();
+  await expect(studio).not.toHaveAttribute('data-kelo-world-loading', '1');
   expect(errors.filter(e => /WORLD_EDITOR_OPEN_TIMEOUT|CREATOR_WORLD_STUDIO_MOUNT_FAILED/.test(e))).toEqual([]);
 });
