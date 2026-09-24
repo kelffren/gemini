@@ -16,3 +16,10 @@ const CATALOG=Object.freeze([
   {category:'VISUAL',items:[['avatar','Avatar','active'],['asset-sheet','Asset Sheet Studio','active'],['appearance','Appearance','active'],['animation','Animation','active'],['vfx','VFX','active'],['cinematic','Cinematic','active']]},
   {category:'CONTENT',items:[['content-studio','Content Studio','active'],['prefab','Prefab','active'],['environment','Environment','active'],['audio','Audio','active']]}
 ]);
+
+const REPOSITORY_PROJECT_TYPES=Object.freeze({
+  animation:'ANIMATION',vfx:'VFX',ability:'ABILITY','sprite-ability':'SPRITE_ABILITY',
+  parcel:'PARCEL',dungeon:'DUNGEON','game-mode':'GAME_MODE',npc:'NPC',quest:'QUEST',
+  item:'ITEM',crafting:'CRAFTING',cinematic:'CINEMATIC',prefab:'PREFAB',
+  environment:'ENVIRONMENT',audio:'AUDIO'
+});
