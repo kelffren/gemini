@@ -13,8 +13,9 @@ const MOBILE_QUERY='(max-width:760px)';
 const CSS=`
 #kelo-studio-live .ks-action-feedback{
   display:none;position:fixed;z-index:2147482295;left:50%;transform:translateX(-50%);
-  width:min(430px,calc(100vw - 24px));pointer-events:auto
+  width:min(430px,calc(100vw - 24px));pointer-events:none
 }
+#kelo-studio-live .ks-action-feedback button{pointer-events:auto}
 @media(max-width:760px){
   #kelo-studio-live .ks-action-feedback[data-visible="1"]{
     display:flex;align-items:center;gap:9px;
