@@ -10,6 +10,7 @@ async function installFixture(page,{selectionCount=1}={}){
   await page.setViewportSize({width:390,height:844});
   await page.evaluate(async count=>{
     document.getElementById('kelo-studio-live')?.remove();
+    document.getElementById('kelo-luxe')?.remove();
     window.__feedbackHits=Object.create(null);
     const shell=document.createElement('section');
     shell.id='kelo-studio-live';
