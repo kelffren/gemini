@@ -10,6 +10,7 @@ async function installFixture(page,{selectionCount=0,keepFavorites=false}={}){
   await page.setViewportSize({width:390,height:844});
   await page.evaluate(async ({count,keep})=>{
     document.getElementById('kelo-studio-live')?.remove();
+    document.getElementById('kelo-luxe')?.remove();
     sessionStorage.removeItem('kelo.studio.mobileToolbar.recents');
     if(!keep)localStorage.removeItem('kelo.studio.mobileToolbar.favorites');
     const shell=document.createElement('section');
