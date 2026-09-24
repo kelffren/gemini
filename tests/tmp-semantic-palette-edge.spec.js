@@ -35,6 +35,7 @@ test.beforeEach(async({page})=>{
 test('refresh hot-swaps palette and keeps active brush state',async({page})=>{
   const result=await page.evaluate(async()=>{
     const bridge=await import('./src/studio/integration/library-build-bridge.mjs?v=semantic-edge-test');
+    const seeder=await import('./src/studio/adapters/catalog-prefab-seeder.mjs?v=semantic-edge-test');
     const rows=[
       {id:'personal:a:1',sourceId:'a',placeable:true,label:'A1',width:32,height:32,category:'nature'},
       {id:'personal:a:2',sourceId:'a',placeable:true,label:'A2',width:32,height:32,category:'nature'},
@@ -42,6 +43,7 @@ test('refresh hot-swaps palette and keeps active brush state',async({page})=>{
       {id:'personal:b:2',sourceId:'b',placeable:true,label:'B2',width:32,height:32,category:'nature'}
     ];
     const session=window.__makeSemanticSession(rows);
+    seeder.seedCatalogPrefabs({prefabRegistry:session.studio.kernel.prefabs,assetCatalog:session.studio.adapter.assetCatalog});
     const tool=await bridge.ensureLibraryPaletteBrush(session,{root:window});
     tool.configurePalette(rows.slice(0,2),{activate:true,smartContext:false,avoidOverlap:false,minSpacing:0,radius:0,snap:1});
     const before={active:tool.state().active,palette:tool.getPalette().map(x=>x.id)};
@@ -64,6 +66,7 @@ test('refresh with only one available template does not destroy current palette'
       {id:'personal:solo:1',sourceId:'solo',placeable:true,label:'Solo',width:32,height:32,category:'nature'}
     ];
     const session=window.__makeSemanticSession(rows);
+    seeder.seedCatalogPrefabs({prefabRegistry:session.studio.kernel.prefabs,assetCatalog:session.studio.adapter.assetCatalog});
     const tool=await bridge.ensureLibraryPaletteBrush(session,{root:window});
     tool.configurePalette(rows.slice(0,2),{activate:true,smartContext:false,avoidOverlap:false,minSpacing:0,radius:0,snap:1});
     const before=tool.getPalette().map(x=>x.id);
