@@ -68,7 +68,8 @@ export async function searchExternalAssets(query='',options={}){
   if(options.category&&options.category!=='all')assets=assets.filter(a=>a.category===options.category);
   if(options.contentKind&&options.contentKind!=='all')assets=assets.filter(a=>(a.contentKind||visualKind(a.category))===options.contentKind);
   const seen=new Set();assets=assets.filter(a=>a?.id&&!seen.has(a.id)&&seen.add(a.id));
-  if(options.rank!==false)assets=rankAssets(assets,{query:q,sceneProfile:options.sceneProfile||globalThis.KELO_ASSET_SCENE_PROFILE||null,weights:options.rankWeights});
+  let sceneProfile=options.sceneProfile||globalThis.KELO_ASSET_SCENE_PROFILE||null;if(!sceneProfile){try{sceneProfile=JSON.parse(globalThis.localStorage?.getItem?.('kelo.asset.scene-profile.v1')||'null');}catch{}}
+  if(options.rank!==false)assets=rankAssets(assets,{query:q,sceneProfile,weights:options.rankWeights});
   assets=assets.slice(0,wanted?MAX_PROVIDER_PAGE:MAX_FEDERATED_RESULTS);
   rememberRecent(assets);
   return{assets,providers:bundles.map(b=>({id:b.provider.id,name:b.provider.name,mode:b.provider.mode,error:b.error,count:b.assets?.length||0,total:b.page?.total??null,engine:b.page?.engine||null,browseUrl:b.provider.browseUrl||b.provider.sourceUrl,license:b.provider.license,lazy:isLazy(b.provider),verified:b.provider.verified===true,requiresQuery:b.page?.requiresQuery===true||b.provider.requiresQuery===true,supportsRemotePreview:b.provider.supportsRemotePreview!==false,supportsCORS:b.provider.supportsCORS!==false,supportsThumbnail:b.provider.supportsThumbnail!==false,supportsOriginalDownload:b.provider.supportsOriginalDownload!==false&&b.provider.catalogOnly!==true})),page:{offset,limit:perProviderLimit,hasMore:bundles.some(b=>!!b.page?.hasMore),lazyIncluded:includeLazy,bounded:true,maxResults:MAX_FEDERATED_RESULTS,ranking:options.rank===false?'provider-order':'asset-intelligence-v1'}};
