@@ -10,6 +10,8 @@ import { bootKeloCreators } from '../creator-entry.mjs?v=world-editor-20260924-2
 
 let active=null;
 let openingPromise=null;
+const GLOBAL_HUB_KEY='__KELO_CREATOR_HUB_SINGLETON_V1__';
+const GLOBAL_OPEN_KEY='__KELO_CREATOR_HUB_OPENING_V1__';
 
 const CATALOG=Object.freeze([
   {category:'BUILD',items:[['world','World','active'],['map-forge','Map Forge','active'],['parcel','Parcel','active'],['dungeon','Dungeon','active'],['game-mode','Game Mode','active']]},
@@ -389,8 +391,10 @@ async function openCreatorHubImpl({root=globalThis}={}){
   }
 
   function destroy(){
-    if(active?.hub!==hub)return;
+    const shared=root?.[GLOBAL_HUB_KEY];
+    if(active?.hub!==hub&&shared?.hub!==hub)return;
     active=null;
+    try{if(root?.[GLOBAL_HUB_KEY]?.hub===hub)delete root[GLOBAL_HUB_KEY];}catch{}
     hub.remove();
     style.remove();
     doc.removeEventListener('keydown',onKey,true);
@@ -418,12 +422,37 @@ async function openCreatorHubImpl({root=globalThis}={}){
 }
 
 export function openCreatorHub(options={}){
-  if(active?.hub?.isConnected)return Promise.resolve(active);
+  const root=options.root||globalThis;
+  const shared=root?.[GLOBAL_HUB_KEY];
+  if(shared?.hub?.isConnected){
+    active=shared;
+    return Promise.resolve(shared);
+  }
+  if(active?.hub?.isConnected){
+    try{root[GLOBAL_HUB_KEY]=active;}catch{}
+    return Promise.resolve(active);
+  }
+  const sharedOpening=root?.[GLOBAL_OPEN_KEY];
+  if(sharedOpening)return sharedOpening;
   if(openingPromise)return openingPromise;
-  openingPromise=Promise.resolve()
-    .then(()=>openCreatorHubImpl(options))
-    .finally(()=>{openingPromise=null;});
-  return openingPromise;
+
+  let promise=null;
+  promise=Promise.resolve()
+    .then(()=>openCreatorHubImpl({...options,root}))
+    .then(session=>{
+      if(session?.hub?.isConnected){
+        active=session;
+        try{root[GLOBAL_HUB_KEY]=session;}catch{}
+      }
+      return session;
+    })
+    .finally(()=>{
+      if(openingPromise===promise)openingPromise=null;
+      try{if(root?.[GLOBAL_OPEN_KEY]===promise)delete root[GLOBAL_OPEN_KEY];}catch{}
+    });
+  openingPromise=promise;
+  try{root[GLOBAL_OPEN_KEY]=promise;}catch{}
+  return promise;
 }
 
 export function closeCreatorHub(){active?.close?.();}
