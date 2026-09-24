@@ -124,3 +124,54 @@ test('diagnose direct placement commit vs pointer path', async ({page}) => {
   expect(direct.assetId).toBeTruthy();
   expect(direct.previewAfterBegin).toBeTruthy();
 });
+
+
+test('mobile UI asset tap commits through the real pointer path', async ({page}) => {
+  test.setTimeout(140000);
+  await openDirect(page);
+
+  const studio=page.locator('#kelo-studio-live');
+  const before=await page.evaluate(()=>window.__KELO_PLACEMENT_DIAG_SESSION?.studio?.kernel?.document?.entities?.length??-1);
+
+  const asset=studio.locator('[data-asset]:visible').first();
+  await expect(asset).toBeVisible({timeout:10000});
+  const assetId=await asset.getAttribute('data-asset');
+  expect(assetId).toBeTruthy();
+  await asset.tap();
+
+  await page.waitForFunction(() => {
+    const live=window.__KELO_PLACEMENT_DIAG_SESSION;
+    return live?.mode==='placement' && !!live?.studio?.tools?.placement?.getPreview?.();
+  },null,{timeout:10000});
+
+  const stateAfterAsset=await page.evaluate(()=>({
+    mode:window.__KELO_PLACEMENT_DIAG_SESSION?.mode||null,
+    preview:window.__KELO_PLACEMENT_DIAG_SESSION?.studio?.tools?.placement?.getPreview?.()||null,
+    activeAsset:document.getElementById('kelo-studio-live')?.dataset?.activeAsset||null
+  }));
+  console.log('[PLACEMENT_UI_AFTER_ASSET]',JSON.stringify(stateAfterAsset));
+
+  const canvas=page.locator('#game-canvas');
+  await expect(canvas).toBeVisible({timeout:10000});
+  const box=await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  const tap={x:Math.max(80,Math.min(box.width-80,box.width*0.52)),y:Math.max(160,Math.min(box.height-260,box.height*0.40))};
+  await canvas.tap({position:tap});
+
+  await page.waitForFunction(previous => {
+    const live=window.__KELO_PLACEMENT_DIAG_SESSION;
+    return (live?.studio?.kernel?.document?.entities?.length??-1)>previous;
+  },before,{timeout:15000});
+
+  const after=await page.evaluate(()=>({
+    entities:window.__KELO_PLACEMENT_DIAG_SESSION?.studio?.kernel?.document?.entities?.length??-1,
+    mode:window.__KELO_PLACEMENT_DIAG_SESSION?.mode||null,
+    preview:window.__KELO_PLACEMENT_DIAG_SESSION?.studio?.tools?.placement?.getPreview?.()||null,
+    propertyPlacements:window.KELO_PROPERTY_SYSTEM?.getPlacements?.('parcel:world:editor')?.length??-1,
+    worldEditError:window.KELO_WORLD_EDIT?.lastError||null
+  }));
+  console.log('[PLACEMENT_UI_AFTER_TAP]',JSON.stringify({assetId,before,tap,...after}));
+  expect(after.entities).toBeGreaterThan(before);
+  expect(after.propertyPlacements).toBeGreaterThan(0);
+  expect(after.worldEditError).toBeNull();
+});
