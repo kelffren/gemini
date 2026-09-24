@@ -9,7 +9,7 @@
   if(root.KELO_POST_BOOT_STREAMER)return;
   const VERSION='kelo-post-boot-streamer-v2.1-world-handoff';
   const FILES=[
-    'src/core/feature-registry.js?v=4',
+    'src/core/feature-registry.js?v=5',
     'src/core/asset-registry.js?v=2-feature-registry',
     'src/core/module-loader.js?v=10-feature-registry',
     'src/ui/asset-library-launcher.js?v=11-semantic-context',

@@ -23,7 +23,8 @@ const version=read('version.json');
 const doc=read('docs/systems/APP_UPDATE_SYSTEM.md');
 
 // Boot ownership: only the lightweight gate belongs on the normal path.
-expect(has(index,'src/core/update-gate.js'),'index carga KeloUpdateGate ligero');
+expect(has(index,'src/core/post-boot-streamer.js')&&!has(index,'src/core/update-gate.js'),'index difiere KeloUpdateGate hasta post-playable');
+expect(has(read('src/core/post-boot-streamer.js'),'src/core/update-gate.js'),'post-boot streamer conserva KeloUpdateGate ligero');
 expect(!has(index,'src/core/update-system-v5.js'),'updater pesado V5 no está en critical path');
 expect(!has(index,'src/core/update-watch.js'),'watch no está en critical path');
 expect(!has(index,'src/core/update-system.js'),'updater legacy no vuelve al critical path');
