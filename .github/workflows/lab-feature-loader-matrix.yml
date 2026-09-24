@@ -1,0 +1,37 @@
+name: LAB Feature Loader Matrix
+
+on:
+  push:
+    branches:
+      - lab/current-main-failure-matrix-20260924
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  features:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install chromium --with-deps
+      - name: Serve
+        shell: bash
+        run: |
+          mkdir -p test-results
+          python3 -m http.server 4173 --bind 127.0.0.1 >test-results/http.log 2>&1 &
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:4173/index.html >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Lazy feature runtime matrix
+        continue-on-error: true
+        env:
+          KELO_PAGES: http://127.0.0.1:4173/
+        run: npx playwright test tests/tmp-feature-loader-matrix.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
