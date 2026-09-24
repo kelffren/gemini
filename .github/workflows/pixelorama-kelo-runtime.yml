@@ -78,7 +78,7 @@ jobs:
           du -h .pixelorama-src/build/web/*
 
       - name: Upload immutable runtime artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pixelorama-kelo-${{ env.PIXELORAMA_SOURCE_SHA }}
           path: .pixelorama-src/build/web
