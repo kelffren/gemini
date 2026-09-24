@@ -74,6 +74,17 @@ export async function openCreatorHub({root=globalThis}={}){
   }
 
   const platform=await bootKeloCreators({root});
+  const enforceHubChrome=()=>{
+    const studio=doc.getElementById('kelo-studio-live');
+    if(!studio?.isConnected){
+      try{doc.body.classList.remove('kelo-studio-active');}catch{}
+    }
+  };
+  enforceHubChrome();
+  const MutationObserverCtor=root.MutationObserver||globalThis.MutationObserver;
+  const hubChromeObserver=MutationObserverCtor?new MutationObserverCtor(enforceHubChrome):null;
+  try{hubChromeObserver?.observe?.(doc.body,{attributes:true,attributeFilter:['class'],childList:true});}catch{}
+
   const style=make('style',{'data-kelo-creators-ui':'',textContent:css()});
   style.setAttribute('data-kelo-creators-ui','');
   doc.head.append(style);
@@ -385,6 +396,7 @@ export async function openCreatorHub({root=globalThis}={}){
   function destroy(){
     if(active?.hub!==hub)return;
     active=null;
+    try{hubChromeObserver?.disconnect?.();}catch{}
     hub.remove();
     style.remove();
     doc.removeEventListener('keydown',onKey,true);
