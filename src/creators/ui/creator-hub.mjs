@@ -61,10 +61,19 @@ function make(tag,props={},children=[]){
 }
 
 export async function openCreatorHub({root=globalThis}={}){
-  if(active)return active;
+  if(active?.hub?.isConnected)return active;
   if(!root.document)throw new Error('CREATOR_HUB_DOM_REQUIRED');
 
-  const platform=await bootKeloCreators({root}),doc=root.document;
+  const doc=root.document;
+  const live=doc.getElementById('kelo-studio-live');
+  if(!live?.isConnected){
+    try{doc.body.classList.remove('kelo-studio-active');}catch{}
+    try{doc.getElementById('kelo-world-launch-curtain')?.remove();}catch{}
+    try{doc.querySelector('canvas.kelo-studio-overlay')?.remove();}catch{}
+    active=null;
+  }
+
+  const platform=await bootKeloCreators({root});
   const style=make('style',{'data-kelo-creators-ui':'',textContent:css()});
   style.setAttribute('data-kelo-creators-ui','');
   doc.head.append(style);
