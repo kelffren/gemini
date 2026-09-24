@@ -62,7 +62,8 @@ if(provider.id==='opensource3d'&&provider.mode==='lazy-live-api'){if(options.con
 return{provider,assets:[],error:null,page:{offset,limit,hasMore:false}};}catch(error){return{provider,assets:[],error:String(error?.message||error),page:{offset,limit,hasMore:false}};}}
 export async function searchExternalAssets(query='',options={}){
   const cfg=await loadProviderConfig(),providers=(cfg.providers||[]).filter(p=>p.enabled!==false),qa=browserQA(),wanted=options.providers?.length?new Set(options.providers):qa.provider?new Set([qa.provider]):null,q=clean(query).toLowerCase(),includeLazy=!!wanted||options.includeLazy===true,{offset,limit}=pageOptions(options),selected=providers.filter(p=>wanted?wanted.has(p.id):(!isLazy(p)||(includeLazy&&(q.length>0||p.requiresQuery!==true)))),perProviderLimit=wanted?limit:Math.max(1,Math.min(limit,Math.floor(MAX_FEDERATED_RESULTS/Math.max(1,selected.length)))),bundles=await Promise.all(selected.map(p=>browseProvider(p.id,{query:q,offset,limit:perProviderLimit,contentKind:options.contentKind})));
-  let assets=bundles.flatMap(b=>b.assets||[]);
+  const providerCapabilities=new Map(providers.map(p=>[p.id,p]));
+  let assets=bundles.flatMap(b=>b.assets||[]).map(asset=>{const p=providerCapabilities.get(asset?.provider)||{};return{...asset,supportsRemotePreview:p.supportsRemotePreview!==false,supportsCORS:p.supportsCORS!==false,supportsThumbnail:p.supportsThumbnail!==false,supportsOriginalDownload:p.supportsOriginalDownload!==false&&p.catalogOnly!==true};});
   if(q)assets=assets.filter(a=>matches(a,q)||['kenney','ambientcg','polyhaven','openverse-images','openverse-audio','3dassets','gobkit','sfxmint','opensource3d'].includes(a.provider));
   if(options.category&&options.category!=='all')assets=assets.filter(a=>a.category===options.category);
   if(options.contentKind&&options.contentKind!=='all')assets=assets.filter(a=>(a.contentKind||visualKind(a.category))===options.contentKind);
