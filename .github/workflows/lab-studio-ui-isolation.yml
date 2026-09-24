@@ -1,0 +1,44 @@
+name: LAB Studio UI Isolation
+
+on:
+  push:
+    branches:
+      - lab/main-regression-audit-20260924
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  studio-ui:
+    strategy:
+      fail-fast: false
+      matrix:
+        spec:
+          - tests/studio-mobile-context-ui.spec.js
+          - tests/studio-mobile-action-feedback.spec.js
+          - tests/studio-mobile-adaptive-toolbar.spec.js
+          - tests/studio-mobile-radial-context.spec.js
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CI: true
+      KELO_PAGES: http://127.0.0.1:4173/
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install chromium --with-deps
+      - name: Serve
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/kelo-studio-ui-http.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/index.html >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Run isolated spec
+        run: npx playwright test ${{ matrix.spec }} --project=chromium --workers=1 --retries=0 --reporter=list
