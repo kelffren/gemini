@@ -19,6 +19,7 @@ jobs:
           - tests/studio-mobile-action-feedback.spec.js
           - tests/studio-mobile-adaptive-toolbar.spec.js
           - tests/studio-mobile-radial-context.spec.js
+          - tests/tmp-properties-feature-completeness.spec.js
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
