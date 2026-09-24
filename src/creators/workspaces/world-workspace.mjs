@@ -220,6 +220,22 @@ async function openMountedStudio(mod,root){
   }
   return session;
 }
+async function ensureWorldPlacementRuntime(root){
+  if(root?.KELO_PROPERTY_SYSTEM?.request)return root.KELO_PROPERTY_SYSTEM;
+  const loader=root?.KELO_MODULE_LOADER;
+  if(typeof loader?.ensure!=='function')throw new Error('WORLD_EDITOR_PROPERTY_LOADER_UNAVAILABLE');
+  paintBootProgress(root,1,1);
+  const ok=await withTimeout(
+    root,
+    Promise.resolve(loader.ensure('properties')),
+    Math.min(10000,studioOpenBudget(root)),
+    'WORLD_EDITOR_PROPERTY_LOAD_TIMEOUT'
+  );
+  if(ok===false||typeof root?.KELO_PROPERTY_SYSTEM?.request!=='function'){
+    throw new Error('WORLD_EDITOR_PROPERTY_RUNTIME_UNAVAILABLE');
+  }
+  return root.KELO_PROPERTY_SYSTEM;
+}
 async function loadStudioModule(loader,root,{fresh=false}={}){
   if(fresh){
     const src=Function.prototype.toString.call(loader);
@@ -262,6 +278,7 @@ export function createWorldWorkspaceManifest({loader=()=>import(`../../studio/in
             await paintInteractiveChrome(root,previewOnly?'Cargando vista previa…':'Cargando editor…');
             await yieldFrames(root,1);
           }
+          if(!previewOnly)await ensureWorldPlacementRuntime(root);
           const edit=await waitForWorldEditAuthority(root);
           let prepared=null;
           if(mapDefinition){
