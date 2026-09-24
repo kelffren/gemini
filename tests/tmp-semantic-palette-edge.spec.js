@@ -60,6 +60,7 @@ test('refresh hot-swaps palette and keeps active brush state',async({page})=>{
 test('refresh with only one available template does not destroy current palette',async({page})=>{
   const result=await page.evaluate(async()=>{
     const bridge=await import('./src/studio/integration/library-build-bridge.mjs?v=semantic-edge-test');
+    const seeder=await import('./src/studio/adapters/catalog-prefab-seeder.mjs?v=semantic-edge-test');
     const rows=[
       {id:'personal:a:1',sourceId:'a',placeable:true,label:'A1',width:32,height:32,category:'nature'},
       {id:'personal:a:2',sourceId:'a',placeable:true,label:'A2',width:32,height:32,category:'nature'},
