@@ -1,0 +1,27 @@
+name: Studio Asset Intelligence Gate
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/studio/ui/studio-asset-palette.mjs'
+      - 'src/creators/assets/asset-discovery-intelligence.mjs'
+      - 'tests/studio-asset-intelligence-integration.test.mjs'
+      - '.github/workflows/studio-asset-intelligence-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Asset intelligence unit
+        run: node tests/asset-discovery-intelligence.test.mjs
+      - name: Studio integration smoke
+        run: node tests/studio-asset-intelligence-integration.test.mjs
+      - name: Documentation audit
+        run: npm run audit:docs
