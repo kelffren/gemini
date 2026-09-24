@@ -10,6 +10,7 @@ async function installFixture(page,{selectionCount=0}={}){
   await page.setViewportSize({width:390,height:844});
   await page.evaluate(async count=>{
     document.getElementById('kelo-studio-live')?.remove();
+    document.getElementById('kelo-luxe')?.remove();
     document.getElementById('radial-test-canvas')?.remove();
     window.__radialHits=Object.create(null);
     const canvas=document.createElement('canvas');canvas.id='radial-test-canvas';canvas.width=390;canvas.height=844;
@@ -67,7 +68,7 @@ test('selection context exposes transform actions and delegates to original comm
 test('MÁS is only a shortcut to the existing mobile tools entry point',async({page})=>{
   await installFixture(page,{selectionCount:1});
   await longPressCanvas(page);
-  await page.locator('.ks-radial-layer').getByRole('menuitem',{name:'MÁS'}).click();
+  await page.locator('.ks-radial-layer').getByRole('menuitem',{name:'Mostrar herramientas avanzadas'}).click();
   expect(await page.evaluate(()=>window.__radialHits.more||0)).toBe(1);
 });
 
