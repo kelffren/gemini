@@ -104,11 +104,19 @@
   window.__keloHoldGameLoop=true;
   try{
     var q=new URLSearchParams(location.search);
-    if(q.get('guest')==='1'||q.get('aiGuest')==='1'){
+    var explicitGuest=q.get('guest')==='1'||q.get('aiGuest')==='1'||q.get('visualLab')==='1'||q.get('mapEditor')==='1';
+    if(explicitGuest){
       document.documentElement.setAttribute('data-kelo-auth-gate','off');
       document.documentElement.setAttribute('data-kelo-guest-play','1');
       sessionStorage.setItem('kelo_local_guest_play_v1','1');
       localStorage.setItem('kelo_local_guest_play_v1','1');
+      if(!window.KeloGuestPlay){
+        var guestScript=document.createElement('script');
+        guestScript.src='src/auth/guest-play-bypass.js?v=2.2-explicit';
+        guestScript.async=false;
+        guestScript.dataset.keloGuestPlayBoot='1';
+        document.head.appendChild(guestScript);
+      }
     }
     var freeze=q.get('freezeLab')==='1'||q.get('freeze')==='1'||q.get('debugFreeze')==='1';
     var recovery=q.get('recoveryLab')==='1'||q.get('debugRecovery')==='1'||freeze;
