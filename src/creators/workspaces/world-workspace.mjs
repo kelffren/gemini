@@ -227,7 +227,7 @@ async function ensureWorldPlacementRuntime(root){
   paintBootProgress(root,1,1);
   const ok=await withTimeout(
     root,
-    Promise.resolve(loader.ensure('properties')),
+    Promise.resolve(loader.ensure('property-core')),
     Math.min(10000,studioOpenBudget(root)),
     'WORLD_EDITOR_PROPERTY_LOAD_TIMEOUT'
   );
