@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: TEST / LIVE / BLACK SCREEN
  * owner: Live Black Screen Audit
- * purpose: reproduce the published game exactly as a clean mobile user and capture screenshot/console/network evidence
+ * purpose: reproduce the published game exactly as a clean mobile user and capture screenshot/console/network evidence (post-cache-bust)
  * do-not: do not infer from source; observe the deployed UI/runtime only
  */
 const { test, expect } = require('@playwright/test');
