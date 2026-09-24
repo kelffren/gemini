@@ -12,7 +12,7 @@
   'use strict';
   if(window.KELO_STUDIO_LAUNCHER)return;
   let loading=false,factoryLoading=false,forgeLoading=false,directOpenStarted=false;
-  const CREATOR_BUILD='asset-forge-20260915-1';
+  const CREATOR_BUILD='world-editor-20260924-2';
   // TEMPORAL: Creadores queda abierto para todos. Mantener permissionAllowed()
   // permite restaurar permisos cambiando solo este flag a false.
   const OPEN_CREATOR_ACCESS=true;
@@ -156,7 +156,7 @@
   }
   function boot(){bootSurgery();sync();maybeOpenDirect();void bootOnlineAuthorization();void import('./../characters/creator-avatar-runtime.mjs').then(m=>m.installCreatorAvatarRuntime({root:window})).catch(e=>console.warn('[Kelo Avatar runtime]',e));}
   window.KELO_ADMIN_KEYS?.onChange?.(()=>{sync();maybeOpenDirect();});
-  const api=Object.freeze({version:'studio-launcher-v1.20.1-open-access',open,openSpriteFactory:openFactory,openAssetForge:openForge,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
+  const api=Object.freeze({version:'studio-launcher-v1.20.2-world-handoff',open,openSpriteFactory:openFactory,openAssetForge:openForge,sync,get allowed(){return allowed();},get directRequested(){return directRequested();}});
   window.KELO_STUDIO_LAUNCHER=api;
   window.KELO_CREATORS_LAUNCHER=api;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
