@@ -33,10 +33,10 @@ jobs:
           done
           cat test-results/http.log
           exit 1
-      - name: Run current World placement acceptance
+      - name: Run direct placement command diagnosis
         env:
           KELO_PAGES: http://127.0.0.1:4173/
-        run: npx playwright test tests/world-placement-functional.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
+        run: npx playwright test tests/tmp-world-placement-direct.spec.js --project=chromium --workers=1 --retries=0 --reporter=list
       - uses: actions/upload-artifact@v4
         if: always()
         with:
