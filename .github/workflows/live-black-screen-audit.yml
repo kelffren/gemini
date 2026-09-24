@@ -1,0 +1,37 @@
+name: Live Black Screen Audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tests/live-black-screen.spec.js'
+      - '.github/workflows/live-black-screen-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  live-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install
+        run: npm ci --no-audit --no-fund
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+      - name: Audit published live game
+        run: npx playwright test tests/live-black-screen.spec.js --project=chromium
+      - name: Upload live evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: live-black-screen-evidence
+          path: test-results/live-black-screen/
+          if-no-files-found: error
