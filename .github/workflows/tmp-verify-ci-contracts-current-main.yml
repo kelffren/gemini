@@ -1,0 +1,24 @@
+name: TEMP Verify CI Contracts Current Main
+on:
+  push:
+    branches: [fix/ci-contracts-current-main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Updater contract
+        run: npm run audit:updater
+      - name: Guardian failover contract
+        run: node scripts/guardian-pvp-failover-audit.mjs
+      - name: Studio foundation contract
+        run: npm run audit:studio
