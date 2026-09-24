@@ -25,7 +25,7 @@ test('Creator Hub World launch does not bounce back to previous menu',async({pag
   });
 
   const hubModule=await page.evaluate(async()=>{
-    const mod=await import('./src/creators/ui/creator-hub.mjs?v=asset-forge-20260915-1');
+    const mod=await import('./src/creators/ui/creator-hub.mjs?v=world-editor-20260924-2');
     await mod.openCreatorHub({root:window});
     return true;
   });
