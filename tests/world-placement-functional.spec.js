@@ -71,13 +71,13 @@ test('mobile World editor places a real asset into the map', async ({ page }) =>
   const beforeObjects = await objectCount(studio);
   const beforeExplorer = await studio.locator('[data-entity]').count();
 
-  const editAssets = studio.locator('[data-act="edit-assets"]:visible').first();
+  const editAssets = studio.locator('[data-act="edit-assets"]:visible, [data-kelo-proxy="act:edit-assets"]:visible').first();
   await expect(editAssets).toBeVisible({ timeout: 10_000 });
   await editAssets.tap();
 
-  const asset = studio.locator('[data-pane="assets"] [data-asset]:visible').first();
+  const asset = studio.locator('.ks-asset-palette-item[data-asset-palette-id]:visible, [data-pane="assets"] [data-asset]:visible').first();
   await expect(asset).toBeVisible({ timeout: 20_000 });
-  const assetId = await asset.getAttribute('data-asset');
+  const assetId = (await asset.getAttribute('data-asset-palette-id')) || (await asset.getAttribute('data-asset'));
   expect(assetId).toBeTruthy();
   await asset.tap();
   await expect(studio).toHaveAttribute('data-active-asset', String(assetId), { timeout: 5_000 });
