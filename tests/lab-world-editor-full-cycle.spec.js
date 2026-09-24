@@ -359,7 +359,7 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
   expect(beforeKernel.count).toBeGreaterThanOrEqual(0);
   const beforeIds = new Set(beforeKernel.ids);
 
-  const editAssets = studio.locator('[data-act="edit-assets"]:visible').first();
+  const editAssets = studio.locator('[data-act="edit-assets"]:visible, [data-kelo-proxy="act:edit-assets"]:visible').first();
   await expect(editAssets).toBeVisible({ timeout: 10000 });
   await editAssets.tap();
 
@@ -419,7 +419,7 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
   const placedRows = studio.locator(`[data-entity="${entityId}"]`);
   await expect.poll(async () => placedRows.count(), { timeout: 10000 }).toBeGreaterThan(0);
   if (await studio.locator(`[data-entity="${entityId}"]:visible`).count() === 0) {
-    const editForExplorer = studio.locator('[data-act="edit-assets"]:visible').first();
+    const editForExplorer = studio.locator('[data-act="edit-assets"]:visible, [data-kelo-proxy="act:edit-assets"]:visible').first();
     if (await editForExplorer.count()) await editForExplorer.tap();
     const explorerTab = studio.locator('[data-tab="explorer"]:visible').first();
     await expect(explorerTab).toBeVisible({ timeout: 10000 });
@@ -465,7 +465,7 @@ test('4d60d2e full mobile World cycle survives open/place/move/close/walk/reopen
 
   // Explorer rows are virtualized lazily on historical mobile Studio. After
   // reopening, activate the visible workspace first, then assert the persisted row.
-  const editForPersistedExplorer = studio.locator('[data-act="edit-assets"]:visible').first();
+  const editForPersistedExplorer = studio.locator('[data-act="edit-assets"]:visible, [data-kelo-proxy="act:edit-assets"]:visible').first();
   if (await editForPersistedExplorer.count()) await editForPersistedExplorer.tap();
   const persistedExplorerTab = studio.locator('[data-tab="explorer"]:visible').first();
   await expect(persistedExplorerTab).toBeVisible({ timeout: 10000 });
