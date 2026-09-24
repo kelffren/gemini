@@ -3,7 +3,7 @@
  * owner: KeloAssetDiscovery
  * keys: ASSET SEARCH SEMANTIC DUNGEON KIT ROOM COMPATIBLE SNAP BUILD-WITH-THIS MOBILE
  * purpose: rankea y clasifica metadata de assets para que Studio encuentre piezas/rooms/kits compatibles sin descargar binarios.
- * public-api: classifyAsset, parseIntent, rankAssets, compatibleAssets, buildWithThisPlan, snapCompatibility
+ * public-api: classifyAsset, parseIntent, rankAssets, compatibleAssets, buildWithThisPlan, snapCompatibility, dungeonDNA, styleCompatibility, groupSearchResults, continueBuilding
  * consumes: metadata del catálogo/proveedores; no descarga previews ni assets originales
  * state-owned: ninguno; funciones puras y planes efímeros
  * online: la misma API acepta resultados/metadata de autoridad server sin cambiar consumidores
@@ -26,6 +26,9 @@ const INTENT_RULES=Object.freeze({
  corridor:['corridor','hallway','passage'],
  lowpoly:['low poly','low-poly','lowpoly'],
  mobile:['mobile','optimized','performance','lite']
+});
+const ROLE_RULES=Object.freeze({
+ entrance:['entrance','gate','entry'],boss:['boss','arena'],treasure:['treasure','loot','chest'],puzzle:['puzzle','riddle'],trap:['trap','hazard','spike'],corridor:['corridor','hallway','passage'],combat:['combat','battle'],secret:['secret','hidden'],exit:['exit','escape']
 });
 const CONNECTION_ALIASES=Object.freeze({wall:['wall','corner','door','arch','pillar'],corner:['wall','corner'],door:['wall','arch','corridor','room'],corridor:['door','room','stairs','corridor'],room:['door','corridor','stairs','room'],stairs:['corridor','room','stairs']});
 function words(value){return String(value||'').toLowerCase().replace(/[_-]+/g,' ').replace(/[^a-z0-9áéíóúñ ]+/g,' ').split(/\s+/).filter(Boolean)}
@@ -65,10 +68,31 @@ export function snapCompatibility(source={},candidate={}){
 export function compatibleAssets(source,assets=[],context={}){
  return assets.map(asset=>({asset,compat:snapCompatibility(source,asset)})).filter(x=>x.compat.compatible).map(x=>({...x,rank:rankAssets([x.asset],'',context)[0]?.score||0})).sort((a,b)=>b.compat.confidence-a.compat.confidence||b.rank-a.rank);
 }
+export function styleCompatibility(asset={},context={}){
+ const wanted=new Set((context.styles||[]).map(x=>String(x).toLowerCase())), t=textOf(asset);
+ if(!wanted.size)return Object.freeze({score:1,matches:[],conflicts:[]});
+ const matches=[],conflicts=[];wanted.forEach(x=>{if(t.includes(x))matches.push(x);else conflicts.push(x)});
+ return Object.freeze({score:matches.length/wanted.size,matches:Object.freeze(matches),conflicts:Object.freeze(conflicts)});
+}
+export function dungeonDNA(asset={}){
+ const a=classifyAsset(asset),t=textOf(a),roles=[];for(const [role,keys] of Object.entries(ROLE_RULES))if(hasPhrase(t,keys)||a.gameplay.includes(role))roles.push(role);
+ const topo=asset.topology||{},rooms=Number(topo.rooms||asset.roomCount||0),branches=Number(topo.branches||0),deadEnds=Number(topo.deadEnds||0);
+ return Object.freeze({theme:(a.themes||[])[0]||null,style:(a.styles||[])[0]||null,roles:Object.freeze(roles),rooms,branches,deadEnds,verticality:topo.verticality||asset.verticality||'unknown',density:topo.density||asset.density||'unknown',playtimeMinutes:topo.playtimeMinutes||asset.playtimeMinutes||null});
+}
+export function groupSearchResults(ranked=[]){
+ const out={scenes:[],dungeons:[],kits:[],rooms:[],modules:[],props:[]};
+ for(const row of ranked){const t=classifyAsset(row.asset||row).type,key=t==='dungeon'?'dungeons':t==='kit'?'kits':t==='room'?'rooms':t==='module'?'modules':t==='scene'?'scenes':'props';out[key].push(row)}
+ return Object.freeze(out);
+}
+export function continueBuilding(placed=[],assets=[],context={}){
+ const recent=placed.slice(-8),wanted=new Map();
+ for(const source of recent)for(const item of compatibleAssets(source,assets,context).slice(0,12)){const id=item.asset.id;if(!id)continue;const prev=wanted.get(id)||{asset:item.asset,score:0,reasons:0};prev.score+=item.compat.confidence*10+(item.rank||0);prev.reasons++;wanted.set(id,prev)}
+ return [...wanted.values()].map(x=>({...x,score:Math.round(x.score*100)/100,style:styleCompatibility(x.asset,context)})).sort((a,b)=>(b.score+b.style.score*10)-(a.score+a.style.score*10)).slice(0,24);
+}
 export function buildWithThisPlan(seed={},assets=[],context={}){
  const root=classifyAsset(seed), compatible=compatibleAssets(root,assets,context).slice(0,24);
  const groups={walls:[],doors:[],rooms:[],stairs:[],props:[]};
  for(const item of compatible){const t=classifyAsset(item.asset).type;(groups[t==='module'?(textOf(item.asset).includes('door')?'doors':textOf(item.asset).includes('stair')?'stairs':'walls'):t==='room'?'rooms':'props']||groups.props).push(item.asset)}
- return Object.freeze({version:1,seedId:root.id||null,mode:'context-build',styleLock:Object.freeze([...(context.styles||root.styles||[])]),groups:Object.freeze(groups),suggestions:Object.freeze(compatible.map(x=>x.asset.id).filter(Boolean))});
+ return Object.freeze({version:2,seedId:root.id||null,mode:'context-build',styleLock:Object.freeze([...(context.styles||root.styles||[])]),dungeonDNA:dungeonDNA(root),groups:Object.freeze(groups),suggestions:Object.freeze(compatible.map(x=>x.asset.id).filter(Boolean))});
 }
-export default Object.freeze({classifyAsset,parseIntent,rankAssets,compatibleAssets,buildWithThisPlan,snapCompatibility});
+export default Object.freeze({classifyAsset,parseIntent,rankAssets,compatibleAssets,buildWithThisPlan,snapCompatibility,dungeonDNA,styleCompatibility,groupSearchResults,continueBuilding});
