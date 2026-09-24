@@ -208,7 +208,10 @@ function ensureContextBar(shell,root){
     const more=bar.querySelector('.ks-mobile-more');
     if(more){
       const open=shell.dataset.mobileAdvanced==='1';
-      more.textContent=open?'MENOS':'MÁS';more.setAttribute('aria-expanded',open?'true':'false');
+      const label=open?'MENOS':'MÁS';
+      const expanded=open?'true':'false';
+      if(more.textContent!==label)more.textContent=label;
+      if(more.getAttribute('aria-expanded')!==expanded)more.setAttribute('aria-expanded',expanded);
     }
   }
   return bar;
@@ -223,8 +226,7 @@ function enhance(shell,root=globalThis){
   });
   const status=shell.querySelector('.ks-status');
   if(status){status.setAttribute('role','status');status.setAttribute('aria-live','polite');}
-  // TEMP DIAGNOSTIC: contextual mobile action deck disabled to isolate the World loading freeze.
-  // ensureContextBar(shell,root);
+  ensureContextBar(shell,root);
   return shell;
 }
 
@@ -246,7 +248,14 @@ export function installStudioMobileUiPolish({root=globalThis}={}){
   const watch=shell=>{
     if(!MutationObserverCtor||!shell||shell===observedShell)return;
     shellObserver?.disconnect?.();observedShell=shell;
-    shellObserver=new MutationObserverCtor(scheduleRefresh);
+    shellObserver=new MutationObserverCtor(records=>{
+      const relevant=records.some(record=>{
+        if(record.type==='attributes')return true;
+        const target=record.target?.nodeType===1?record.target:record.target?.parentElement;
+        return !target?.closest?.('.ks-mobile-context-actions');
+      });
+      if(relevant)scheduleRefresh();
+    });
     shellObserver.observe(shell,{childList:true,subtree:true,attributes:true,attributeFilter:['data-selection-count','data-compact']});
   };
   const refresh=()=>{
