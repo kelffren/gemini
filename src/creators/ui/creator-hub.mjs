@@ -9,6 +9,8 @@
 import { bootKeloCreators } from '../creator-entry.mjs?v=world-tree-20260929';
 
 let active=null;
+const HUB_KEY='KELO_CREATORS_HUB_ACTIVE';
+const currentActive=root=>root?.[HUB_KEY]||active||null;
 
 const CATALOG=Object.freeze([
   {category:'BUILD',items:[['world','World','active'],['map-forge','Map Forge','active'],['parcel','Parcel','active'],['dungeon','Dungeon','active'],['game-mode','Game Mode','active']]},
@@ -61,7 +63,16 @@ function make(tag,props={},children=[]){
 }
 
 export async function openCreatorHub({root=globalThis}={}){
-  if(active)return active;
+  // Safari/WebContent can evict the Studio shell while leaving the body mode class
+  // behind. That stale class hides Creator Hub via CSS and makes navigation appear
+  // to bounce or disappear even though the Hub was recreated.
+  try{
+    const live=root?.document?.getElementById?.('kelo-studio-live');
+    if(!live?.isConnected)root?.document?.body?.classList?.remove?.('kelo-studio-active');
+  }catch{}
+  const existing=currentActive(root);
+  if(existing?.hub?.isConnected)return existing;
+  if(existing&&!existing?.hub?.isConnected){try{if(root?.[HUB_KEY]===existing)delete root[HUB_KEY];}catch{}if(active===existing)active=null;}
   if(!root.document)throw new Error('CREATOR_HUB_DOM_REQUIRED');
 
   const platform=await bootKeloCreators({root}),doc=root.document;
@@ -211,7 +222,12 @@ export async function openCreatorHub({root=globalThis}={}){
           if(readyWatch){clearInterval(readyWatch);readyWatch=null;}
           // Remove this exact parked Hub even if another cache-busted hub module owns
           // its own module-local active singleton.
-          try{hub.remove();style.remove();doc.removeEventListener('keydown',onKey,true);}catch{}
+          try{
+            // A cache-busted Hub module may have painted another parked Hub.
+            // Remove only parked launch instances, never an unrelated live workspace.
+            for(const parked of doc.querySelectorAll('#kelo-creators-hub[data-kelo-world-launch="1"]'))parked.remove();
+            hub.remove();style.remove();doc.removeEventListener('keydown',onKey,true);
+          }catch{}
           if(active?.hub===hub)active=null;
           return true;
         };
@@ -291,12 +307,16 @@ export async function openCreatorHub({root=globalThis}={}){
         card.dataset.workspace=wid;
         if(permitted){
           if(wid==='world'){
-            card.addEventListener('pointerup',event=>{
-              if(event.button!=null&&event.button!==0)return;
-              event.preventDefault();
-              event.stopPropagation();
+            const launchWorld=event=>{
+              if(event?.button!=null&&event.button!==0)return;
+              event?.preventDefault?.();
+              event?.stopPropagation?.();
               void openWorkspace(wid);
-            });
+            };
+            card.addEventListener('pointerup',launchWorld);
+            // iOS/Safari may suppress or lose pointerup across a recreated modal.
+            // click is the semantic fallback; opening.size makes the second event a no-op.
+            card.addEventListener('click',launchWorld);
           }else card.onclick=()=>void openWorkspace(wid);
         }
         grid.append(card);
@@ -384,8 +404,10 @@ export async function openCreatorHub({root=globalThis}={}){
   }
 
   function destroy(){
-    if(active?.hub!==hub)return;
-    active=null;
+    const owned=currentActive(root);
+    if(owned?.hub!==hub&&active?.hub!==hub&&!hub.isConnected)return;
+    if(active?.hub===hub)active=null;
+    try{if(root[HUB_KEY]?.hub===hub)delete root[HUB_KEY];}catch{}
     hub.remove();
     style.remove();
     doc.removeEventListener('keydown',onKey,true);
@@ -401,15 +423,16 @@ export async function openCreatorHub({root=globalThis}={}){
   doc.addEventListener('keydown',onKey,true);
 
   active=Object.freeze({
-    version:'kelo-creator-hub-v1.19.2-world-handoff',
+    version:'kelo-creator-hub-v1.19.3-global-singleton',
     hub,platform,
     get section(){return current;},
     show:render,
     close:destroy
   });
+  try{root[HUB_KEY]=active;}catch{}
   await render('create');
   return active;
 }
 
-export function closeCreatorHub(){active?.close?.();}
-export function getCreatorHub(){return active;}
+export function closeCreatorHub({root=globalThis}={}){currentActive(root)?.close?.();}
+export function getCreatorHub({root=globalThis}={}){return currentActive(root);}
