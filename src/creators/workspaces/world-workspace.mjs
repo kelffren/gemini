@@ -12,7 +12,7 @@ const actor=root=>String(root.KELO_ADMIN_KEYS?.playerId?.()||root.keloNet?.playe
 const finite=v=>Number.isFinite(Number(v));
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const LAUNCH_CURTAIN_ID='kelo-world-launch-curtain';
-const STUDIO_OPEN_MS=20000;
+const STUDIO_OPEN_MS=60000;
 const DEFAULT_LAUNCH_YIELD_MS=420;
 const DEFAULT_RUNTIME_YIELD_FALLBACK_MS=120;
 const WORLD_BUILD='world-tree-20260929';
