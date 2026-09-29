@@ -129,6 +129,18 @@ test('World recovers a stale Studio session instead of leaving iOS on a black pa
     });
     await expect(page.locator('#kelo-creators-hub')).toBeVisible({ timeout: 10000 });
     await page.locator('#kelo-creators-hub [data-workspace="world"]').click();
+    await page.waitForTimeout(1200);
+    console.log('WORLD_REOPEN_PROBE', JSON.stringify(await page.evaluate(() => ({
+      hubCount: document.querySelectorAll('#kelo-creators-hub').length,
+      hubVisible: !!document.querySelector('#kelo-creators-hub')?.getBoundingClientRect?.().width,
+      studio: !!document.getElementById('kelo-studio-live'),
+      studioLoading: document.getElementById('kelo-studio-live')?.dataset?.keloWorldLoading || null,
+      bodyStudioActive: document.body.classList.contains('kelo-studio-active'),
+      aborted: window.KELO_WORLD_LAUNCH_ABORTED,
+      platform: !!window.KELO_CREATORS_PLATFORM,
+      platformVersion: window.KELO_CREATORS_PLATFORM?.version || null,
+      lastHubError: document.querySelector('.kc-launch-error')?.textContent || null
+    }))));
 
     const recovered = page.locator('#kelo-studio-live');
     await expect(recovered).toBeVisible({ timeout: 15000 });
