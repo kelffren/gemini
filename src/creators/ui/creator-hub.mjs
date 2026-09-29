@@ -9,6 +9,8 @@
 import { bootKeloCreators } from '../creator-entry.mjs?v=world-tree-20260929';
 
 let active=null;
+const HUB_KEY='KELO_CREATORS_HUB_ACTIVE';
+const currentActive=root=>root?.[HUB_KEY]||active||null;
 
 const CATALOG=Object.freeze([
   {category:'BUILD',items:[['world','World','active'],['map-forge','Map Forge','active'],['parcel','Parcel','active'],['dungeon','Dungeon','active'],['game-mode','Game Mode','active']]},
@@ -61,7 +63,9 @@ function make(tag,props={},children=[]){
 }
 
 export async function openCreatorHub({root=globalThis}={}){
-  if(active)return active;
+  const existing=currentActive(root);
+  if(existing?.hub?.isConnected)return existing;
+  if(existing&&!existing?.hub?.isConnected){try{if(root?.[HUB_KEY]===existing)delete root[HUB_KEY];}catch{}if(active===existing)active=null;}
   if(!root.document)throw new Error('CREATOR_HUB_DOM_REQUIRED');
 
   const platform=await bootKeloCreators({root}),doc=root.document;
@@ -389,8 +393,10 @@ export async function openCreatorHub({root=globalThis}={}){
   }
 
   function destroy(){
-    if(active?.hub!==hub)return;
-    active=null;
+    const owned=currentActive(root);
+    if(owned?.hub!==hub&&active?.hub!==hub&&!hub.isConnected)return;
+    if(active?.hub===hub)active=null;
+    try{if(root[HUB_KEY]?.hub===hub)delete root[HUB_KEY];}catch{}
     hub.remove();
     style.remove();
     doc.removeEventListener('keydown',onKey,true);
@@ -406,15 +412,16 @@ export async function openCreatorHub({root=globalThis}={}){
   doc.addEventListener('keydown',onKey,true);
 
   active=Object.freeze({
-    version:'kelo-creator-hub-v1.19.2-world-handoff',
+    version:'kelo-creator-hub-v1.19.3-global-singleton',
     hub,platform,
     get section(){return current;},
     show:render,
     close:destroy
   });
+  try{root[HUB_KEY]=active;}catch{}
   await render('create');
   return active;
 }
 
-export function closeCreatorHub(){active?.close?.();}
-export function getCreatorHub(){return active;}
+export function closeCreatorHub({root=globalThis}={}){currentActive(root)?.close?.();}
+export function getCreatorHub({root=globalThis}={}){return currentActive(root);}
