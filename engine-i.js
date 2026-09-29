@@ -1,9 +1,3 @@
-/* KELO-INDEX
- * area: ENGINE / MINIMAP CLEANUP
- * keys: MINIMAP PURGE STUDIO PREVIEW
- * hace: retira el minimapa heredado sin borrar miniaturas del editor.
- * online: N/A, limpieza visual local.
- */
 // Minimap is intentionally disabled. Plaza/tileset rendering remains owned by engine-l.js.
 (function(root){
 'use strict';
