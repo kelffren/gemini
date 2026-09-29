@@ -20,6 +20,7 @@ const semanticSource=fs.readFileSync(new URL('../src/studio/tools/semantic-brush
 const vaultSource=fs.readFileSync(new URL('../asset-vault.html',import.meta.url),'utf8');
 const launcherSource=fs.readFileSync(new URL('../src/ui/asset-library-launcher.js',import.meta.url),'utf8');
 const indexSource=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
+const postBootSource=fs.readFileSync(new URL('../src/core/post-boot-streamer.js',import.meta.url),'utf8');
 
 // Bridge orchestrates existing Studio tools. Authority writes must stay outside the bridge.
 assert.doesNotMatch(bridgeSource,/KELO_WORLD_EDIT/,'library build bridge must not write World authority directly');
@@ -44,7 +45,8 @@ assert.match(semanticSource,/SEMANTIC_PRESETS/,'semantic presets must be data-dr
 for(const [label,expected] of [['Oak Tree','canopy'],['Fern Patch','understory'],['Rock Small','detail'],['Street Lamp','roadside'],['River Reeds','waterside'],['Stone House','structure'],['Mystery Asset','generic']])assert.equal(inferSemanticRole({label}),expected);
 
 // Library keeps explicit persistence before either single or palette handoff.
-assert.match(vaultSource,/data-act="build"/,'buildable cards must expose Poner');
+assert.match(vaultSource,/data-act="primary"/,'buildable cards must expose their primary action');
+assert.match(vaultSource,/data-place-id/,'buildable cards must expose direct Poner');
 assert.match(vaultSource,/data-act="palette"/,'visual cards must expose palette selection');
 assert.match(vaultSource,/MAX_PALETTE=12/,'phone palette selection must be bounded');
 assert.match(vaultSource,/await downloadAsset\(remote\)/,'remote content must persist through Mi Baúl before World use');
@@ -52,8 +54,9 @@ assert.match(vaultSource,/await integrateContent\(id\)/,'palette assets must int
 assert.match(vaultSource,/kelo:build-personal-palette/,'library must hand the persisted palette to the game');
 assert.match(vaultSource,/state\.palette\.clear\(\)/,'active-page palette must be disposable on page hibernation');
 assert.match(launcherSource,/platform\.openWorkspace\('world'\)/,'launcher must open the real World workspace directly');
-assert.match(launcherSource,/library-build-bridge\.mjs\?v=3/,'launcher must use semantic-aware build bridge');
-assert.match(indexSource,/asset-library-launcher\.js\?v=10-semantic-brush/,'boot must cache-bust the semantic launcher');
+assert.match(launcherSource,/library-build-bridge\.mjs\?v=4/,'launcher must use semantic-aware build bridge');
+assert.match(indexSource,/post-boot-streamer\.js/,'boot must reach post-boot streamer');
+assert.match(postBootSource,/asset-library-launcher\.js\?v=12-place-first/,'streamer must cache-bust the semantic launcher');
 
 // Pure template selection contract.
 const catalogRows=[
