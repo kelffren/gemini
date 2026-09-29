@@ -307,12 +307,16 @@ export async function openCreatorHub({root=globalThis}={}){
         card.dataset.workspace=wid;
         if(permitted){
           if(wid==='world'){
-            card.addEventListener('pointerup',event=>{
-              if(event.button!=null&&event.button!==0)return;
-              event.preventDefault();
-              event.stopPropagation();
+            const launchWorld=event=>{
+              if(event?.button!=null&&event.button!==0)return;
+              event?.preventDefault?.();
+              event?.stopPropagation?.();
               void openWorkspace(wid);
-            });
+            };
+            card.addEventListener('pointerup',launchWorld);
+            // iOS/Safari may suppress or lose pointerup across a recreated modal.
+            // click is the semantic fallback; opening.size makes the second event a no-op.
+            card.addEventListener('click',launchWorld);
           }else card.onclick=()=>void openWorkspace(wid);
         }
         grid.append(card);
