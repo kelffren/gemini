@@ -15,6 +15,7 @@ const brushSource=fs.readFileSync(new URL('../src/studio/tools/library-palette-b
 const bridgeSource=fs.readFileSync(new URL('../src/studio/integration/library-build-bridge.mjs',import.meta.url),'utf8');
 const launcherSource=fs.readFileSync(new URL('../src/ui/asset-library-launcher.js',import.meta.url),'utf8');
 const indexSource=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
+const postBootSource=fs.readFileSync(new URL('../src/core/post-boot-streamer.js',import.meta.url),'utf8');
 
 assert.match(resolverSource,/surfaceNeighborhood/,'road + water must use a bounded local terrain neighborhood');
 assert.match(resolverSource,/kernel\.spatial\?\.queryRect/,'building context must use Studio spatial index');
@@ -26,7 +27,8 @@ assert.match(brushSource,/toggleSmartContext/,'brush must provide a kill switch'
 assert.match(brushSource,/REGLAS ON/,'mobile UI must expose whether semantic rules are active');
 assert.match(bridgeSource,/library-palette-brush-tool\.mjs\?v=3-context/,'bridge must cache-bust the context brush');
 assert.match(launcherSource,/library-build-bridge\.mjs\?v=4/,'launcher must use context-aware bridge');
-assert.match(indexSource,/asset-library-launcher\.js\?v=11-semantic-context/,'game boot must cache-bust context launcher');
+assert.match(indexSource,/post-boot-streamer\.js/,'game boot must reach post-boot streamer');
+assert.match(postBootSource,/asset-library-launcher\.js\?v=12-place-first/,'streamer must cache-bust context launcher');
 
 assert.equal(classifySurfaceCell({role:'path',material:'grass'}),'path');
 assert.equal(classifySurfaceCell({role:'terrain',material:'water_deep'}),'water');

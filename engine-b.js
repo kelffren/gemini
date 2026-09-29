@@ -57,7 +57,7 @@ function openSocialModal(player, sx, sy) {
   modal.style.left = Math.min(sx, screenW - 180) + 'px';
   modal.style.top = Math.min(sy, screenH - 160) + 'px';
 }
-function closeSocialModal() { document.getElementById('social-modal').style.display = 'none'; activeSocialTarget = null; }
+function closeSocialModal(){const m=document.getElementById('social-modal');if(m)m.style.display='none';activeSocialTarget=null;}
 function socialAction(action) {
   if (action === 'Desafiar 1v1') startPvP(activeSocialTarget);
   else if (action === 'Visitar Casa') { camera.targetX = activeSocialTarget.plotX; camera.targetY = activeSocialTarget.plotY; localPlayer.x = activeSocialTarget.plotX - 60; localPlayer.y = activeSocialTarget.plotY; }

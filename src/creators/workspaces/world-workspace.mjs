@@ -4,7 +4,7 @@
  * owns: descriptor and lazy routing into existing live Studio controller
  * does-not-own: World editor, commands, drafts, authority, terrain, collisions, PropertySystem or camera
  * reuse: existing openKeloStudioLive() remains implementation; Map Forge handoff imports through Studio adapter + KELO_WORLD_EDIT and focuses through KeloCamera
- * mobile: paint Studio chrome first; the world-studio-bridge is the single owner of the serialized critical iPhone prewarm so Safari does not parse the full editor graph before controller hydrate; recovery retries use a stable build tag, never a nonce
+ * mobile: paint Studio chrome first; load the existing Property module owner on demand if post-boot streaming has not reached it; the world-studio-bridge owns serialized critical iPhone prewarm; recovery retries use a stable build tag, never a nonce
  */
 import { waitForWorldEditAuthority } from '../adapters/world-creator-adapter.mjs';
 
@@ -15,7 +15,7 @@ const LAUNCH_CURTAIN_ID='kelo-world-launch-curtain';
 const STUDIO_OPEN_MS=20000;
 const DEFAULT_LAUNCH_YIELD_MS=420;
 const DEFAULT_RUNTIME_YIELD_FALLBACK_MS=120;
-const WORLD_BUILD='world-bridge-20260924-24';
+const WORLD_BUILD='world-tree-20260929';
 const PHONE_RUNTIME_ROOTS=Object.freeze([
   '../../studio/input/pointer-input-adapter.mjs',
   '../../studio/input/studio-camera-controller.mjs',
@@ -111,7 +111,7 @@ function paintLaunchCurtain(root,message='Abriendo World Editor…'){
       el.setAttribute('role','status');
       el.setAttribute('aria-live','polite');
     }
-    if(el.style)el.style.cssText='position:fixed;inset:0;z-index:2147482300;display:grid;place-items:center;padding:24px;background:rgba(5,12,14,.92);color:#f7e7b4;font:800 15px/1.45 Inter,system-ui,-apple-system,sans-serif;letter-spacing:.12em;text-align:center;pointer-events:auto';
+    if(el.style)el.style.cssText='position:fixed;inset:0;z-index:2147483200;display:grid;place-items:center;padding:24px;background:rgba(5,12,14,.92);color:#f7e7b4;font:800 15px/1.45 Inter,system-ui,-apple-system,sans-serif;letter-spacing:.12em;text-align:center;pointer-events:auto';
     doc.body.append?.(el);
   }
   el.textContent=message;
@@ -135,7 +135,7 @@ export function paintWorldEditorLaunchShell(root=globalThis,message='Abriendo Wo
       shell.setAttribute('aria-modal','true');
       shell.setAttribute('aria-label','Kelo Studio');
     }else if(shell.dataset)shell.dataset.keloWorldLoading='1';
-    if(shell.style)shell.style.cssText='position:fixed;inset:0;z-index:2147482200;display:grid;grid-template-rows:auto 1fr;background:#050e10;color:#f7e7b4;font:800 13px/1.4 Inter,system-ui,-apple-system,sans-serif;pointer-events:auto';
+    if(shell.style)shell.style.cssText='position:fixed;inset:0;z-index:2147483100;display:grid;grid-template-rows:auto 1fr;background:#050e10;color:#f7e7b4;font:800 13px/1.4 Inter,system-ui,-apple-system,sans-serif;pointer-events:auto';
     shell.innerHTML='<div style="display:flex;align-items:center;gap:10px;min-height:58px;padding:12px 16px;border-bottom:1px solid rgba(231,197,106,.42)"><div style="width:36px;height:36px;border:1px solid rgba(231,197,106,.5);border-radius:11px;display:grid;place-items:center">♛</div><div><div style="letter-spacing:.14em">KELO STUDIO</div><div style="margin-top:4px;font-size:9px;letter-spacing:.18em;color:#9bb7ad">MODO CREADOR</div></div></div><div class="ks-status" data-kelo-world-launch-status="1" style="display:grid;place-items:center;letter-spacing:.12em">'+message+'</div>';
     doc.body.append?.(shell);
   }else if(shell.dataset){
@@ -222,6 +222,10 @@ async function openMountedStudio(mod,root){
 }
 async function ensureWorldPlacementRuntime(root){
   if(root?.KELO_PROPERTY_SYSTEM?.request)return root.KELO_PROPERTY_SYSTEM;
+  // KELO-INDEX WORLD/PROPERTY asegura el owner del placement aunque World se toque antes de post-boot streaming.
+  if(typeof root?.KELO_MODULE_LOADER?.ensure!=='function' && root===globalThis){
+    await import('../../core/module-loader.js?v=10-feature-registry');
+  }
   const loader=root?.KELO_MODULE_LOADER;
   if(typeof loader?.ensure!=='function')throw new Error('WORLD_EDITOR_PROPERTY_LOADER_UNAVAILABLE');
   paintBootProgress(root,1,1);

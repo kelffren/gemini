@@ -5,13 +5,13 @@ if(typeof document==='undefined')return;
 root.KELO_HIDE_MINIMAP=true;
 const known='#kw-live-minimap,#kelo-minimap,#minimap,.kelo-minimap,.lx-mark,[data-minimap],[id*="minimap" i],[class*="minimap" i],[id*="mini-map" i],[class*="mini-map" i]';
 function removeNode(node){
-  if(!(node instanceof HTMLElement))return false;
+  if(!(node instanceof HTMLElement)||node.closest?.('[data-kelo-studio-ui]'))return false;
   const host=node.closest?.(known)||node;
   if(host&&host!==document.body&&host.id!=='game-canvas'){host.remove();return true;}
   return false;
 }
 function looksLikeLegacyBottomLeftMap(el){
-  if(!(el instanceof HTMLElement)||el.id==='game-canvas')return false;
+  if(!(el instanceof HTMLElement)||el.id==='game-canvas'||el.closest?.('[data-kelo-studio-ui]'))return false;
   const r=el.getBoundingClientRect();
   if(r.width<48||r.height<48||r.width>260||r.height>260)return false;
   if(r.left>Math.max(72,innerWidth*.30)||r.top<innerHeight*.48)return false;

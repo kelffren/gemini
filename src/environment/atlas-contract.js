@@ -1,15 +1,3 @@
-/* KELO-INDEX
- * area: ENVIRONMENT / ASSETS
- * owner: KELO_ATLAS_CONTRACT
- * keys: ATLAS ASSET ACQUIRE RELEASE REFCOUNT CORE DISTRICT OPTIONAL WARM EVICT MEMORY PERFORMANCE
- * purpose: única creación/carga de atlas y lifecycle refcount + warm eviction para recursos no-core
- * public-api: register/acquire/release/evict/describe/runtimeSnapshot/catalog
- * consumes: KELO_TILE_REGISTRY y contratos de atlas registrados
- * state-owned: records metadata + runtime Image/refcounts/warm timers
- * reuse: world, props y features adquieren por key; nunca reescriben src por su cuenta
- * online: N/A; assets son presentación local
- * do-not: NO crear Image en consumers gestionados, NO liberar core, NO polling de memoria
- */
 (function(){
   'use strict';
   const R=window.KELO_TILE_REGISTRY;
@@ -42,6 +30,7 @@
   });
   const records=new Map();
   const runtime=new Map();
+  let reportedViolations='';
 
   function tierForAtlas(atlas){const d=Math.max(Number(atlas?.width)||0,Number(atlas?.height)||0);if(d<=256)return 'small';if(d<=1024)return 'medium';return 'large';}
   function cacheToken(src){if(typeof src==='string'&&src.startsWith('data:'))return ['embedded','content-addressed'];try{const u=new URL(src,location.href);return [...u.searchParams.entries()].find(([k])=>POLICY.cache.acceptedQueryKeys.includes(k))||null;}catch{return null;}}
@@ -67,7 +56,7 @@
     const warm=Object.freeze([...runtime].filter(([,v])=>v.refs===0&&v.warmUntil>0).map(([k,v])=>Object.freeze({key:k,warmUntil:v.warmUntil})));
     window.KELO_ATLAS_AUDIT=Object.freeze({version:POLICY.version,policyId:POLICY.id,atlasCount:records.size,violations:Object.freeze(violations),roles:Object.freeze(Object.fromEntries([...records].map(([k,v])=>[k,v.role]))),loaded:Object.freeze(loadedEntries.map(([k])=>k)),refCounts:Object.freeze(Object.fromEntries([...runtime].map(([k,v])=>[k,v.refs]))),warm,decodedTextureMB:decodedBytes/(1024*1024),residentDistrictAtlasCount});
     try{window.dispatchEvent(new CustomEvent('kelo:atlas-audit'));}catch{}
-    if(violations.length)console.error('[Kelo atlas] contract violations',violations);
+    const k=JSON.stringify(violations);if(k!==reportedViolations){reportedViolations=k;if(violations.length)console.error('[Kelo atlas] contract violations',violations);}
   }
   function acquire(key){
     const entry=records.get(key);if(!entry)return Promise.reject(new Error(`[Kelo atlas] unknown asset ${key}`));
