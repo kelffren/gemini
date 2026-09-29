@@ -209,7 +209,10 @@ export async function openCreatorHub({root=globalThis}={}){
         const retireHubWhenReady=()=>{
           if(!worldEditorReady())return false;
           if(readyWatch){clearInterval(readyWatch);readyWatch=null;}
-          try{destroy();}catch{}
+          // Remove this exact parked Hub even if another cache-busted hub module owns
+          // its own module-local active singleton.
+          try{hub.remove();style.remove();doc.removeEventListener('keydown',onKey,true);}catch{}
+          if(active?.hub===hub)active=null;
           return true;
         };
         readyWatch=setInterval(retireHubWhenReady,100);
