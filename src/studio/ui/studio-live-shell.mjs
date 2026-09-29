@@ -47,7 +47,7 @@ export function createStudioLiveShell({
   style.dataset.keloStudioUi='1';
   style.textContent=`
   #kelo-studio-live{
-    position:fixed;inset:0;z-index:2147482200;pointer-events:none;color:#edf4ef;
+    position:fixed;inset:0;z-index:2147483100;pointer-events:none;color:#edf4ef;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     --ks-gold:#e7c56a;--ks-gold-2:#f4dd8d;--ks-bg:rgba(5,12,14,.965);
     --ks-panel:rgba(10,24,25,.94);--ks-panel-soft:rgba(15,31,31,.88);
@@ -740,7 +740,10 @@ export function createStudioLiveShell({
 
   syncErase();
   syncCompactAsset();
-  if(!canReuse){renderAssets();renderScene();}
+  // A reused phone shell may contain lightweight launch rows without canvas previews.
+  // Rebuild the asset list once the live preview renderer is wired.
+  renderAssets();
+  if(!canReuse)renderScene();
   syncContextActions();
 
   return Object.freeze({

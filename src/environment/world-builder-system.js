@@ -99,7 +99,7 @@ async function loadAuthorityStack(){
   await loadScriptOnce('kelo-world-revision-system-loader','src/world/world-revision-system.js?v=1');
   await loadScriptOnce('kelo-local-world-edit-authority-loader','src/world/authorities/local-world-edit-authority.js?v=1');
   await loadScriptOnce('kelo-remote-world-edit-authority-loader','src/world/authorities/remote-world-edit-authority.js?v=1');
-  await loadScriptOnce('kelo-world-edit-authority-loader','src/world/world-edit-authority.js?v=1');
+  await loadScriptOnce('kelo-world-edit-authority-loader','src/world/world-edit-authority.js?v=world-tree-20260929');
   return true;
 }
 

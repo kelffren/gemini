@@ -27,7 +27,7 @@
     'src/systems/admin-key-system.js?v=1',
     'src/core/admin-control-lazy-gate.js?v=2',
     'src/core/account-live-control-gate.js?v=2',
-    'src/core/creators-lazy-gate.js?v=world-editor-20260924-2'
+    'src/core/creators-lazy-gate.js?v=world-tree-20260929'
   ];
   const audit=root.KELO_INSTANT_BOOT_AUDIT={version:VERSION,startedAt:0,firstYieldAt:0,loaded:0,total:FILES.length,ready:false,failed:[]};
 

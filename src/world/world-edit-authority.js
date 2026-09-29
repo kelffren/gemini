@@ -79,7 +79,8 @@ async function request(op,payload={}){
   try{
     if(operation==='world:draft:get'&&adjacentDraftRead){
       const draftId=String(payload?.draftId||'');
-      if(draftId&&draftId===adjacentDraftRead.draftId){
+      // KELO-INDEX WORLD/DRAFT la lectura rápida sólo sirve si también trae snapshot para reproyectar placements.
+      if(draftId&&draftId===adjacentDraftRead.draftId&&adjacentDraftRead.result?.viewSnapshot){
         const result=clone(adjacentDraftRead.result);
         adjacentDraftRead=null;
         lastError=null;

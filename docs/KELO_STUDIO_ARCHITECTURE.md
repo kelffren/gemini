@@ -1,6 +1,6 @@
 # Kelo Studio — Architecture
 
-**Actualizado:** 2026-09-14
+**Actualizado:** 2026-09-29
 
 ## Propósito
 
@@ -11,6 +11,7 @@ Kelo Studio es la superficie creator del juego. Edita el mismo mundo/runtime med
 `studio-launcher.js → world-workspace.mjs → world-studio-bridge.mjs → live-studio-controller.mjs → studio-entry.mjs`
 
 En móvil/iPhone, World pinta chrome primero y precarga módulos de manera escalonada, cediendo control entre imports para reducir picos de memoria/CPU.
+Si el jugador toca World antes del streamer posterior al boot, `world-workspace.mjs` asegura el `KeloModuleLoader` existente y su feature `properties` antes de abrir Studio. `KELO_WORLD_EDIT` proyecta el snapshot al volver al borrador; la lectura adyacente de `world:draft:current` no puede sustituir `world:draft:get` sin ese snapshot.
 
 ## Core
 
@@ -48,6 +49,7 @@ La carpeta filtra templates reales; no duplica assets.
 `Property Catalog → palette row → preview → placement tool → Studio command → draft/world authority`
 
 Los previews usan Asset Preview Service + Atlas Contract.
+La limpieza del minimapa heredado excluye `[data-kelo-studio-ui]`; de lo contrario elimina los canvas de miniatura de la biblioteca móvil.
 
 ## Mobile UX
 
@@ -57,6 +59,7 @@ Los previews usan Asset Preview Service + Atlas Contract.
 - EDIT reabre assets sin borrar selección;
 - safe-area respetada;
 - blur/backdrop desactivable en coarse/mobile para proteger Safari.
+- el dock ApprovalRequest de World arranca plegado en móvil, accesible con el botón Aprobación para no tapar las tarjetas de Assets.
 
 ## QA mínimo de World
 
@@ -67,7 +70,8 @@ Los previews usan Asset Preview Service + Atlas Contract.
 5. colocarla;
 6. seleccionarla/moverla/rotarla;
 7. undo/redo;
-8. salir/reabrir;
-9. no black tab, freeze ni pérdida de input.
+8. guardar, salir/reabrir y confirmar el placement en el borrador;
+9. caminar ocho segundos con el joystick tras cerrar World;
+10. no black tab, freeze ni pérdida de input.
 
 Headless sirve como señal, no como verificación final de iPhone.

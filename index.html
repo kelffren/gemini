@@ -63,7 +63,7 @@
   window.KELO_HIDE_MINIMAP=true;
   var minimapSelector='#kw-live-minimap,#kelo-minimap,#minimap,.kelo-minimap,.lx-mark,[data-minimap],[id*="minimap" i],[class*="minimap" i],[id*="mini-map" i],[class*="mini-map" i]';
   var removeMinimapHost=function(el){
-    if(!(el instanceof HTMLElement)||el.id==='game-canvas'||el===document.body||el===document.documentElement)return false;
+    if(!(el instanceof HTMLElement)||el.id==='game-canvas'||el===document.body||el===document.documentElement||el.closest('[data-kelo-studio-ui]'))return false;
     var host=el;
     for(var i=0;i<3&&host.parentElement&&host.parentElement!==document.body;i++){
       var p=host.parentElement,pr=p.getBoundingClientRect(),hr=host.getBoundingClientRect();
@@ -78,7 +78,7 @@
     try{
       document.querySelectorAll(minimapSelector).forEach(removeMinimapHost);
       document.querySelectorAll('canvas,div,section,aside').forEach(function(el){
-        if(!(el instanceof HTMLElement)||el.id==='game-canvas'||!el.isConnected)return;
+        if(!(el instanceof HTMLElement)||el.id==='game-canvas'||!el.isConnected||el.closest('[data-kelo-studio-ui]'))return;
         var r=el.getBoundingClientRect(),ratio=r.height?r.width/r.height:0;
         if(r.width<48||r.height<48||r.width>280||r.height>280||ratio<.55||ratio>1.9)return;
         if(r.left>Math.max(72,innerWidth*.30)||r.top<innerHeight*.48)return;
@@ -137,7 +137,7 @@
 <script>window.KELO_COLLISION.attachLegacyObstacleArray(obstacles,{adoptExistingOwner:'core-static'});</script>
 <script src="src/core/input-system.js?v=2-zero-copy"></script>
 <script src="src/core/movement-system.js?v=3-zero-garbage"></script>
-<script src="engine-b.js?v=95-boot-ready"></script>
+<script src="engine-b.js?v=world-tree-20260929"></script>
 <script src="engine-c.js?v=232-position-owner"></script>
 <script src="src/core/camera-follow-shadow.js?v=1"></script>
 <script src="src/core/camera-system.js?v=1"></script>
@@ -153,7 +153,7 @@
 <script src="engine-g.js?v=96"></script>
 <script src="src/environment/mobile-performance-contract.js?v=2-cache-working-set"></script>
 <script src="engine-h.js?v=151"></script>
-<script src="engine-i.js?v=95-minimap-off-20260916"></script>
+<script src="engine-i.js?v=world-tree-20260929"></script>
 <script src="engine-j.js?v=94"></script>
 <script src="engine-k.js?v=94"></script>
 <script src="src/environment/rural-nature-atlas.js?v=200"></script>
@@ -179,5 +179,5 @@
 <script src="src/systems/performance-governor.js?v=6"></script>
 <script>window.__keloBootReady=true;window.dispatchEvent(new Event("kelo:boot-ready"));window.__KELO_MINIMAP_PURGE__&&window.__KELO_MINIMAP_PURGE__();</script>
 <script src="src/core/traffic-controller.js?v=1"></script>\n<script src="src/core/warm-cache-client.js?v=3"></script>
-<script src="src/core/post-boot-streamer.js?v=place-first-20260924"></script>
+<script src="src/core/post-boot-streamer.js?v=world-tree-20260929"></script>
 </body></html>

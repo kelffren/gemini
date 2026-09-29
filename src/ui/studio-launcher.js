@@ -12,7 +12,7 @@
   'use strict';
   if(window.KELO_STUDIO_LAUNCHER)return;
   let loading=false,factoryLoading=false,forgeLoading=false,directOpenStarted=false;
-  const CREATOR_BUILD='world-editor-20260925-1';
+  const CREATOR_BUILD='world-tree-20260929';
   // TEMPORAL: Creadores queda abierto para todos. Mantener permissionAllowed()
   // permite restaurar permisos cambiando solo este flag a false.
   const OPEN_CREATOR_ACCESS=true;
