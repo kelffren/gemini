@@ -20,7 +20,7 @@ const incomingBuild=bridgeUrl.searchParams.get('v')||'';
 const controllerBuild=(incomingBuild.endsWith('-retry')||incomingBuild.startsWith('world-ios-'))?incomingBuild:WORLD_STUDIO_BRIDGE_BUILD;
 const CONTROLLER=`./live-studio-controller.mjs?v=${encodeURIComponent(controllerBuild)}`;
 const BUG_ID='BUG-0003';
-const CONTROLLER_IMPORT_TIMEOUT_MS=12000;
+const CONTROLLER_IMPORT_TIMEOUT_MS=30000;
 let controllerMod=null;
 
 function runtimeSnapshot(root=globalThis){
