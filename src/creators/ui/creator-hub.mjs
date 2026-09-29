@@ -63,6 +63,13 @@ function make(tag,props={},children=[]){
 }
 
 export async function openCreatorHub({root=globalThis}={}){
+  // Safari/WebContent can evict the Studio shell while leaving the body mode class
+  // behind. That stale class hides Creator Hub via CSS and makes navigation appear
+  // to bounce or disappear even though the Hub was recreated.
+  try{
+    const live=root?.document?.getElementById?.('kelo-studio-live');
+    if(!live?.isConnected)root?.document?.body?.classList?.remove?.('kelo-studio-active');
+  }catch{}
   const existing=currentActive(root);
   if(existing?.hub?.isConnected)return existing;
   if(existing&&!existing?.hub?.isConnected){try{if(root?.[HUB_KEY]===existing)delete root[HUB_KEY];}catch{}if(active===existing)active=null;}
