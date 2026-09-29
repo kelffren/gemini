@@ -202,6 +202,22 @@ export async function openCreatorHub({root=globalThis}={}){
           const live=doc.getElementById('kelo-studio-live');
           return !!(live?.isConnected&&live.dataset?.keloWorldLoading!=='1'&&live.querySelector?.('.ks-status'));
         };
+        // The Studio shell can become interactive before openWorkspace() resolves on a cold
+        // mobile boot. Retire the parked Hub as soon as readiness is observable instead of
+        // leaving a hidden navigation surface alive behind the editor.
+        let readyWatch=null;
+        const retireHubWhenReady=()=>{
+          if(!worldEditorReady())return false;
+          if(readyWatch){clearInterval(readyWatch);readyWatch=null;}
+          // Remove this exact parked Hub even if another cache-busted hub module owns
+          // its own module-local active singleton.
+          try{hub.remove();style.remove();doc.removeEventListener('keydown',onKey,true);}catch{}
+          if(active?.hub===hub)active=null;
+          return true;
+        };
+        readyWatch=setInterval(retireHubWhenReady,100);
+        setTimeout(()=>{if(readyWatch){clearInterval(readyWatch);readyWatch=null;}},60000);
+        retireHubWhenReady();
         const abortWorldLaunch=()=>{
           const live=doc.getElementById('kelo-studio-live');
           if(worldEditorReady())return false;
@@ -214,16 +230,12 @@ export async function openCreatorHub({root=globalThis}={}){
           return true;
         };
         pending.then(()=>{
-          if(worldEditorReady()){
-            setTimeout(()=>{try{destroy();}catch{}},250);
-            return;
-          }
+          if(retireHubWhenReady())return;
           abortWorldLaunch();
           showLaunchError(id,new Error('WORLD_EDITOR_OPEN_TIMEOUT'));
         }).catch(error=>{
-          if(worldEditorReady()){
+          if(retireHubWhenReady()){
             console.warn('[Kelo Creators → world] launch promise rejected after Studio became interactive; keeping World Editor active',error);
-            try{destroy();}catch{}
             return;
           }
           abortWorldLaunch();

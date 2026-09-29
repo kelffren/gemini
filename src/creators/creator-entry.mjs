@@ -40,6 +40,8 @@ import { registerAvatarWorkspace } from './workspaces/avatar-workspace.mjs';
 import { registerDefinitionWorkspaces } from './workspaces/definition-workspaces.mjs';
 import { registerSceneKitWorkspace } from './workspaces/scene-kit-workspace.mjs?v=scene-kit-20260923-1';
 let platform=null;
+const PLATFORM_KEY='KELO_CREATORS_PLATFORM';
+function currentPlatform(root=globalThis){return root?.[PLATFORM_KEY]||platform||null;}
 function ensureCreatorInputLocks(root){
   if(root?.KeloInputLocks?.acquire&&root?.KeloInputLocks?.release)return()=>{};
   const held=new Set();let seq=0;
@@ -56,7 +58,7 @@ function ensureCreatorInputLocks(root){
   return()=>{held.clear();try{if(root.KeloInputLocks===fallback)delete root.KeloInputLocks;}catch{};};
 }
 export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
-  if(platform)return platform;
+  const existing=currentPlatform(root);if(existing)return existing;
   const inputLocksDispose=ensureCreatorInputLocks(root);
   const studioMobileUiPolish=installStudioMobileUiPolish({root});
   const studioMobileToolsSheet=installStudioMobileToolsSheet({root});
@@ -123,7 +125,8 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
     }catch(error){console.warn(`[Creators] ApprovalRequest dock unavailable for ${id}`,error);}
     return session;
   }
-  platform=Object.freeze({version:'kelo-creators-core-v1.34.1-world-handoff',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{for(const dock of root.KELO_CREATOR_APPROVAL_DOCKS?.values?.()||[])dock?.destroy?.();root.KELO_CREATOR_APPROVAL_DOCKS?.clear?.();}catch{}try{looseImportDispose?.();}catch{}try{irregularImportDispose?.();}catch{}try{repairTouchDispose?.();}catch{}try{repairStudioDispose?.();}catch{}try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{studioMobileRadialContext?.destroy?.();}catch{}try{studioMobileCommandSearch?.destroy?.();}catch{}try{studioMobileAdaptiveToolbar?.destroy?.();}catch{}try{studioMobileActionFeedback?.destroy?.();}catch{}try{studioMobileToolsSheet?.destroy?.();}catch{}try{studioMobileUiPolish?.destroy?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}platform=null;}});
+  platform=Object.freeze({version:'kelo-creators-core-v1.34.1-world-handoff',permission,projects,workspaces,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,close(){try{for(const dock of root.KELO_CREATOR_APPROVAL_DOCKS?.values?.()||[])dock?.destroy?.();root.KELO_CREATOR_APPROVAL_DOCKS?.clear?.();}catch{}try{looseImportDispose?.();}catch{}try{irregularImportDispose?.();}catch{}try{repairTouchDispose?.();}catch{}try{repairStudioDispose?.();}catch{}try{manualCutterDispose?.();}catch{}try{easyUiDispose?.();}catch{}try{eventLabDispose?.();}catch{}try{visualUiDispose?.();}catch{}try{studioMobileRadialContext?.destroy?.();}catch{}try{studioMobileCommandSearch?.destroy?.();}catch{}try{studioMobileAdaptiveToolbar?.destroy?.();}catch{}try{studioMobileActionFeedback?.destroy?.();}catch{}try{studioMobileToolsSheet?.destroy?.();}catch{}try{studioMobileUiPolish?.destroy?.();}catch{}try{localState.close?.();}catch{}try{inputLocksDispose?.();}catch{}try{if(root[PLATFORM_KEY]===platform)delete root[PLATFORM_KEY];}catch{}platform=null;}});
+  try{root[PLATFORM_KEY]=platform;}catch{}
   return platform;
 }
-export function getKeloCreatorsPlatform(){return platform;}
+export function getKeloCreatorsPlatform({root=globalThis}={}){return currentPlatform(root);}
