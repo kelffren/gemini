@@ -218,7 +218,14 @@ function createPacedPhoneAssetPreview(assetPreview,root){
 }
 
 export async function openKeloStudioLive({root=globalThis}={}){
-  if(active)return active;if(!root.document)throw new Error('STUDIO_DOM_REQUIRED');
+  if(active){
+    const shell=root.document?.getElementById?.('kelo-studio-live');
+    if(shell?.isConnected&&shell.dataset?.keloWorldLoading!=='1'&&shell.querySelector?.('.ks-status'))return active;
+    // Safari can evict the Studio DOM while retaining its JS module session.
+    // A cached session without its live shell is not reusable.
+    await closeKeloStudioLive({root});
+  }
+  if(!root.document)throw new Error('STUDIO_DOM_REQUIRED');
   const actorId=actor(root);if(!root.KELO_ADMIN_KEYS?.can?.('world.edit',actorId))throw new Error('ADMIN_KEY_PERMISSION_DENIED');if(root.KELO_WORLD_BUILDER?.isMainWorld&&!root.KELO_WORLD_BUILDER.isMainWorld())throw new Error('STUDIO_MAIN_WORLD_ONLY');if(!root.KeloInputLocks?.acquire||!root.KeloInputLocks?.release)throw new Error('STUDIO_INPUT_LOCKS_NOT_READY');
   try{await root.KELO_WORLD_BUILDER_UI?.close?.(false);}catch{}
   if(root.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
