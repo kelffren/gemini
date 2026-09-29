@@ -4,7 +4,7 @@
  * owns: descriptor and lazy routing into existing live Studio controller
  * does-not-own: World editor, commands, drafts, authority, terrain, collisions, PropertySystem or camera
  * reuse: existing openKeloStudioLive() remains implementation; Map Forge handoff imports through Studio adapter + KELO_WORLD_EDIT and focuses through KeloCamera
- * mobile: paint Studio chrome first; the world-studio-bridge is the single owner of the serialized critical iPhone prewarm so Safari does not parse the full editor graph before controller hydrate; recovery retries use a stable build tag, never a nonce
+ * mobile: paint Studio chrome first; load the existing Property module owner on demand if post-boot streaming has not reached it; the world-studio-bridge owns serialized critical iPhone prewarm; recovery retries use a stable build tag, never a nonce
  */
 import { waitForWorldEditAuthority } from '../adapters/world-creator-adapter.mjs';
 
@@ -222,6 +222,10 @@ async function openMountedStudio(mod,root){
 }
 async function ensureWorldPlacementRuntime(root){
   if(root?.KELO_PROPERTY_SYSTEM?.request)return root.KELO_PROPERTY_SYSTEM;
+  // KELO-INDEX WORLD/PROPERTY asegura el owner del placement aunque World se toque antes de post-boot streaming.
+  if(typeof root?.KELO_MODULE_LOADER?.ensure!=='function' && root===globalThis){
+    await import('../../core/module-loader.js?v=10-feature-registry');
+  }
   const loader=root?.KELO_MODULE_LOADER;
   if(typeof loader?.ensure!=='function')throw new Error('WORLD_EDITOR_PROPERTY_LOADER_UNAVAILABLE');
   paintBootProgress(root,1,1);

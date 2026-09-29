@@ -42,9 +42,13 @@ assert.equal(resolved,readyAuthority,'wait bridge should resolve the lazily boot
 assert.equal(bootstrapCalls,1,'wait bridge should bootstrap exactly once');
 assert.equal(resolved.ready,true,'wait bridge should honor the authority readiness contract');
 
+// KELO-INDEX TEST/WORLD el Studio requiere Property antes de abrir; los doubles reproducen ese owner lazy.
+let propertyLoads=0,iosRoot;
+const propertyLoader={ensure:async name=>{assert.equal(name,'properties');propertyLoads++;iosRoot.KELO_PROPERTY_SYSTEM={request:()=>{}};return true;}};
 let shell=null,openCalls=0,closeCalls=0;
-const iosRoot={
+iosRoot={
   KELO_WORLD_EDIT:{ready:true},
+  KELO_MODULE_LOADER:propertyLoader,
   KELO_WORLD_LAUNCH_YIELD_MS:0,
   document:{getElementById:id=>id==='kelo-studio-live'?shell:null},
   performance:{now:()=>Date.now()},
@@ -64,6 +68,7 @@ const manifest=createWorldWorkspaceManifest({
   })
 });
 const session=await manifest.open({root:iosRoot});
+assert.equal(propertyLoads,1,'World must ensure Property before it opens an editable Studio');
 assert.equal(session,recoveredSession,'World workspace must recover when cached Studio session has no mounted shell');
 assert.equal(openCalls,2,'World workspace should retry Studio exactly once after a stale shell');
 assert.equal(closeCalls,1,'World workspace should close the stale Studio session before retrying');
@@ -73,6 +78,8 @@ let loaderStarted=0,chromeBeforeLoader=false;
 const nodes=new Map();
 const paintRoot={
   KELO_WORLD_EDIT:{ready:true},
+  KELO_MODULE_LOADER:propertyLoader,
+  KELO_PROPERTY_SYSTEM:{request:()=>{}},
   KELO_WORLD_LAUNCH_YIELD_MS:0,
   document:{
     body:{
@@ -124,6 +131,8 @@ assert.equal(chromeBeforeLoader,true,'World Studio placeholder must be visible b
 let timeoutCalls=0;
 const hangRoot={
   KELO_WORLD_EDIT:{ready:true},
+  KELO_MODULE_LOADER:propertyLoader,
+  KELO_PROPERTY_SYSTEM:{request:()=>{}},
   KELO_WORLD_OPEN_TIMEOUT_MS:40,
   KELO_WORLD_LAUNCH_YIELD_MS:0,
   document:{getElementById:()=>null,body:{append(){}},createElement:()=>({style:{},dataset:{},setAttribute(){}})},
@@ -143,6 +152,8 @@ assert.ok(timeoutCalls>=1,'timeout path must have attempted a Studio open');
 
 const hangImportRoot={
   KELO_WORLD_EDIT:{ready:true},
+  KELO_MODULE_LOADER:propertyLoader,
+  KELO_PROPERTY_SYSTEM:{request:()=>{}},
   KELO_WORLD_OPEN_TIMEOUT_MS:40,
   KELO_WORLD_LAUNCH_YIELD_MS:0,
   document:{getElementById:()=>null,body:{append(){}},createElement:()=>({style:{},dataset:{},setAttribute(){}})},

@@ -1,7 +1,7 @@
 /* KELO-INDEX
  * area: TEST / WORLD EDITOR / FUNCTIONAL PLACEMENT
  * owner: World editor acceptance
- * purpose: prove the visible mobile Creator flow can open World, select an asset, place it on the live canvas, and expose the new entity in Explorer
+ * purpose: prove the visible mobile Creator flow can open World, preview a tree, place it on the live canvas, and expose the new entity in Explorer
  */
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
@@ -21,25 +21,19 @@ async function openWorld(page) {
     timeout: 15_000,
   });
 
-  await page.waitForFunction(() => !!(
-    window.KeloGuestPlay?.active?.() &&
-    window.KELO_ADMIN_KEYS?.can?.('world.edit') &&
-    window.KELO_LUXE?.toggleMenu &&
-    window.KELO_CREATORS_LAUNCHER
-  ), null, { timeout: 45_000 });
-
-  const menu = page.locator('#lx-side-menu');
-  await expect(menu).toBeVisible({ timeout: 20_000 });
-  await menu.tap();
-
-  const panel = page.locator('#lx-menu-panel');
-  await expect(panel).toHaveClass(/open/, { timeout: 10_000 });
-
-  const creators = page.locator('#lx-create-studio');
-  await expect(creators).toBeVisible({ timeout: 20_000 });
-  await creators.tap();
+  await page.waitForFunction(() => !!(document.querySelector('#kelo-creators-hub') || window.KELO_CREATORS_LAUNCHER), null, { timeout: 45_000 });
 
   const hub = page.locator('#kelo-creators-hub');
+  if (!(await hub.isVisible())) {
+    const quick = page.locator('#kw-quick-actions-toggle');
+    if (await quick.isVisible()) await quick.tap();
+    const menu = page.locator('#lx-side-menu');
+    await expect(menu).toBeVisible({ timeout: 20_000 });
+    await menu.tap();
+    const creators = page.locator('#lx-create-studio');
+    await expect(creators).toBeVisible({ timeout: 20_000 });
+    await creators.tap();
+  }
   await expect(hub).toBeVisible({ timeout: 20_000 });
 
   const world = hub.locator('[data-workspace="world"]');
@@ -71,10 +65,16 @@ test('mobile World editor places a real asset into the map', async ({ page }) =>
   await expect(editAssets).toBeVisible({ timeout: 10_000 });
   await editAssets.tap();
 
-  const asset = studio.locator('[data-pane="assets"] [data-asset]:visible').first();
+  const asset = studio.locator('[data-pane="assets"] [data-asset]:visible').filter({ hasText: /tree|árbol|arbol|roble|pino|oak|pine/i }).first();
   await expect(asset).toBeVisible({ timeout: 20_000 });
   const assetId = await asset.getAttribute('data-asset');
   expect(assetId).toBeTruthy();
+  const thumbnail = asset.locator('canvas').first();
+  await expect(thumbnail).toBeVisible();
+  await expect.poll(() => thumbnail.evaluate(canvas => {
+    const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+    return data.some((value, index) => index % 4 === 3 && value > 10);
+  })).toBeTruthy();
   await asset.tap();
   await expect(studio).toHaveAttribute('data-active-asset', String(assetId), { timeout: 5_000 });
 
