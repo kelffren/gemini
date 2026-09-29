@@ -211,7 +211,12 @@ export async function openCreatorHub({root=globalThis}={}){
           if(readyWatch){clearInterval(readyWatch);readyWatch=null;}
           // Remove this exact parked Hub even if another cache-busted hub module owns
           // its own module-local active singleton.
-          try{hub.remove();style.remove();doc.removeEventListener('keydown',onKey,true);}catch{}
+          try{
+            // A cache-busted Hub module may have painted another parked Hub.
+            // Remove only parked launch instances, never an unrelated live workspace.
+            for(const parked of doc.querySelectorAll('#kelo-creators-hub[data-kelo-world-launch="1"]'))parked.remove();
+            hub.remove();style.remove();doc.removeEventListener('keydown',onKey,true);
+          }catch{}
           if(active?.hub===hub)active=null;
           return true;
         };
