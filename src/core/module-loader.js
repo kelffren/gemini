@@ -38,7 +38,7 @@ const LEGACY_FALLBACK=Object.freeze({
   market:Object.freeze([{src:'src/systems/market-escrow-system.js?v=1',name:'mercado'},{src:'src/ui/market-ui.js?v=2',name:'mercado'}]),
   titles:Object.freeze([{src:'src/systems/title-catalog.js?v=1',name:'títulos'},{src:'src/systems/player-stats.js?v=1',name:'títulos'},{src:'src/systems/title-system.js?v=1',name:'títulos'}]),
   appearance:Object.freeze([{src:'src/characters/character-customization.js?v=1',name:'apariencia'},{src:'src/ui/character-customizer-ui.js?v=1',name:'apariencia'}]),
-  properties:Object.freeze([{src:'src/property/property-system.js?v=4',name:'propiedades'},{src:'src/ui/house-instance-ui.js?v=1',name:'propiedades'}])
+  properties:Object.freeze([{src:'src/property/property-system.js?v=world-tree-visible-20260930c',name:'propiedades'},{src:'src/ui/house-instance-ui.js?v=1',name:'propiedades'}])
 });
 const loaded=Object.create(null);
 const inflight=Object.create(null);

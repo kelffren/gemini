@@ -9,9 +9,9 @@
   if(root.KELO_POST_BOOT_STREAMER)return;
   const VERSION='kelo-post-boot-streamer-v2.1-world-handoff';
   const FILES=[
-    'src/core/feature-registry.js?v=4',
+    'src/core/feature-registry.js?v=world-tree-visible-20260930c',
     'src/core/asset-registry.js?v=2-feature-registry',
-    'src/core/module-loader.js?v=10-feature-registry',
+    'src/core/module-loader.js?v=world-tree-visible-20260930c',
     'src/ui/asset-library-launcher.js?v=12-place-first',
     'src/core/settings-lazy-gate.js?v=3-update-intel',
     'src/core/hot-data-registry.js?v=1-transactional',
@@ -27,7 +27,7 @@
     'src/systems/admin-key-system.js?v=1',
     'src/core/admin-control-lazy-gate.js?v=2',
     'src/core/account-live-control-gate.js?v=2',
-    'src/core/creators-lazy-gate.js?v=world-tree-persist-20260930b'
+    'src/core/creators-lazy-gate.js?v=world-tree-visible-20260930c'
   ];
   const audit=root.KELO_INSTANT_BOOT_AUDIT={version:VERSION,startedAt:0,firstYieldAt:0,loaded:0,total:FILES.length,ready:false,failed:[]};
 
