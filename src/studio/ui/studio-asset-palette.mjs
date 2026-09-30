@@ -5,6 +5,7 @@
  * public-api: createStudioAssetPalette(), filterAssetPaletteRows(), assetPaletteCategories(), forestPlazaFolderChoices(), sanitizeRecentAssetIds()
  * online: no; selecting delegates to existing Studio placement flow; recent choices persist locally only
  */
+import {rankAssets,groupSearchResults,buildWithThisPlan} from '../../creators/assets/asset-discovery-intelligence.mjs';
 
 const STYLE_ID='kelo-studio-asset-palette-style';
 const RECENT_STORAGE_KEY='kelo.studio.assetPalette.recent.v1';
@@ -207,7 +208,9 @@ export function createStudioAssetPalette({root=globalThis,getAssets=()=>[],onSel
       const cat=event.target.closest('[data-asset-palette-category]');
       if(cat){event.preventDefault();category=cat.dataset.assetPaletteCategory||'all';render();return;}
       const item=event.target.closest('[data-asset-palette-id]');
-      if(item){event.preventDefault();event.stopPropagation();choose(item.dataset.assetPaletteId);}
+      if(item){event.preventDefault();event.stopPropagation();choose(item.dataset.assetPaletteId);return;}
+      const build=event.target.closest('[data-build-with-this]');
+      if(build){event.preventDefault();event.stopPropagation();const rows=allRows(),seed=rows.find(x=>String(x.id)===String(build.dataset.buildWithThis));const plan=seed?buildWithThisPlan(seed,rows,{usedAssetIds:recentIds}):null;if(plan?.suggestions?.length){query='';category='all';const search=palette.querySelector('.ks-asset-palette-search');if(search)search.value='';const preferred=new Set(plan.suggestions);const ordered=rows.filter(x=>preferred.has(x.id));const grid=palette.querySelector('.ks-asset-palette-grid');grid.replaceChildren();for(const asset of ordered.slice(0,MAX_VISIBLE)){const b=document.createElement('button');b.type='button';b.className='ks-asset-palette-item';b.dataset.assetPaletteId=String(asset.id);b.textContent=asset.label||asset.name||asset.id;grid.appendChild(b);}}return;}
     });
     palette.addEventListener('pointerdown',event=>event.stopPropagation());
   }
@@ -235,10 +238,14 @@ export function createStudioAssetPalette({root=globalThis,getAssets=()=>[],onSel
     const forest=forestPlazaFolderChoices(rows);
     const generic=assetPaletteCategories(rows,7).filter(item=>!CATEGORY_LABELS[item.id]);
     if(category!=='all'&&category!=='recent'&&!available.has(category))category='all';
-    const filtered=filterAssetPaletteRows(rows,{query,category,recentIds,limit:MAX_VISIBLE});
+    const baseFiltered=filterAssetPaletteRows(rows,{query:'',category,recentIds,limit:Math.max(MAX_VISIBLE,rows.length)});
+    const ranked=query.trim()?rankAssets(baseFiltered,query,{usedAssetIds:recentIds}):baseFiltered.map(asset=>({asset,score:0}));
+    const grouped=groupSearchResults(ranked);
+    const filtered=ranked.slice(0,MAX_VISIBLE).map(row=>row.asset);
+    const intelligent=query.trim().length>0;
 
     const count=palette.querySelector('.ks-asset-palette-count');
-    if(count)count.textContent=`${filtered.length}${filtered.length<rows.length?' visibles':''}`;
+    if(count)count.textContent=intelligent?`${filtered.length} inteligentes`:`${filtered.length}${filtered.length<rows.length?' visibles':''}`;
 
     const choices=[
       {id:'all',label:'Todos',count:rows.length},
@@ -262,6 +269,10 @@ export function createStudioAssetPalette({root=globalThis,getAssets=()=>[],onSel
 
     const grid=palette.querySelector('.ks-asset-palette-grid');
     grid.replaceChildren();
+    if(intelligent){
+      const summary=document.createElement('div');summary.className='ks-asset-palette-empty';
+      summary.style.padding='8px';summary.textContent=['dungeons','kits','rooms','modules','props'].filter(k=>grouped[k]?.length).map(k=>`${k.toUpperCase()} ${grouped[k].length}`).join(' · ')||'RESULTADOS INTELIGENTES';grid.appendChild(summary);
+    }
     if(!filtered.length){
       const empty=document.createElement('div');
       empty.className='ks-asset-palette-empty';
@@ -282,7 +293,7 @@ export function createStudioAssetPalette({root=globalThis,getAssets=()=>[],onSel
       strong.textContent=asset.label||asset.name||asset.id;
       const small=document.createElement('small');
       small.textContent=categoryLabel(rowCategory(asset));
-      copy.append(strong,small);b.append(canvas,copy);grid.appendChild(b);
+      const build=document.createElement('button');build.type='button';build.dataset.buildWithThis=String(asset.id);build.textContent='BUILD WITH THIS';build.style.cssText='grid-column:1/-1;font-size:5px;height:18px;border:0;border-radius:6px;background:#19362e;color:#f0d77d';copy.append(strong,small,build);b.append(canvas,copy);grid.appendChild(b);
       Promise.resolve(renderAssetPreview?.(canvas,asset)).catch(()=>{});
     }
   }
