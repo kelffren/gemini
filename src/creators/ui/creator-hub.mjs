@@ -6,7 +6,7 @@
  * lazy: imported only after explicit CREATORS action; active cards dispatch through workspace registry
  * mobile: World launch paints Studio chrome immediately; Hub stays parked until .ks-status exists without a loading flag and is restored if the editor never mounts
  */
-import { bootKeloCreators } from '../creator-entry.mjs?v=world-tree-persist-20260930';
+import { bootKeloCreators } from '../creator-entry.mjs?v=world-tree-persist-20260930b';
 
 let active=null;
 const HUB_KEY='KELO_CREATORS_HUB_ACTIVE';

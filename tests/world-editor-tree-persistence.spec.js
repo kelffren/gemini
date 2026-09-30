@@ -128,9 +128,9 @@ test('saved tree survives editor reopen, full reload, and a second move', async 
   const row = studio.locator(`[data-entity="${placed.id}"]`).filter({ visible: true }).first();
   await expect(row).toBeVisible({ timeout: 10_000 });
   await row.tap();
-  await studio.locator('[data-tab="properties"]').tap();
+  await studio.locator('[data-tab="properties"]').filter({ visible: true }).first().tap();
   const nextX = placed.x + 64;
-  const xInput = studio.locator('[data-prop="x"]').filter({ visible: true }).first();
+  const xInput = studio.locator('[data-pane="properties"].on [data-prop="x"]').filter({ visible: true }).first();
   await expect(xInput).toBeVisible({ timeout: 8_000 });
   await xInput.fill(String(nextX));
   await xInput.dispatchEvent('change');
