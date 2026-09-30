@@ -26,7 +26,7 @@ async function readDraftSnapshot(adapter,payload){
     return adapter.worldEditRequest('world:draft:get',payload);
   }
 }
-export async function importCurrentKeloWorld({ adapter, mode = 'world', actorId = null, parcelId = null, view = 'published', draftId = null, lite = false } = {}) {
+export async function importCurrentKeloWorld({ adapter, mode = 'world', actorId = null, parcelId = null, view = 'published', draftId = null, lite = false, placementsOnly = false } = {}) {
   if (!adapter) throw new Error('STUDIO_IMPORT_ADAPTER_REQUIRED');
   let snapshot = null, viewMeta = null, targetParcelId = parcelId;
   if (mode === 'parcel') {
@@ -39,8 +39,8 @@ export async function importCurrentKeloWorld({ adapter, mode = 'world', actorId 
   }
   const entities = (snapshot?.placements || []).map(row => placementToEntity(row, adapter.assetCatalog));
   // A10 lite: avoid a second structuredClone of the entire terrain/collision maps on iPhone.
-  // Entities already carry only the fields Studio needs; cells/collisions stay shallow-owned by the document.
-  const terrain = lite ? { ...(snapshot?.cells || {}) } : copy(snapshot?.cells || {});
-  const collisions = lite ? { ...(snapshot?.collisions || {}) } : copy(snapshot?.collisions || {});
+  // placementsOnly skips those maps entirely so a saved tree can return without freezing WebContent.
+  const terrain = placementsOnly ? {} : (lite ? { ...(snapshot?.cells || {}) } : copy(snapshot?.cells || {}));
+  const collisions = placementsOnly ? {} : (lite ? { ...(snapshot?.collisions || {}) } : copy(snapshot?.collisions || {}));
   return createWorldDocument({ worldId: mode === 'parcel' ? String(targetParcelId || `parcel:${actorId || 'local'}`) : String(snapshot?.worldId || 'world:kelo-main'), metadata: { name: mode === 'parcel' ? 'My Parcel' : 'Kelo World', description: '', tags: [mode, 'imported', view, ...(lite?['lite']:[])], source: 'kelo-runtime-import-v2' }, settings: { tileSize: adapter.tileRegistry?.worldTileSize || 32, chunkSize: adapter.worldRenderer?.chunkSize || 512 }, terrain, entities, navigation: { collisions }, revision: { id: viewMeta?.revisionId || viewMeta?.id || viewMeta?.draftId || null, number: Number(viewMeta?.number || viewMeta?.revisionVersion) || 0 } });
 }

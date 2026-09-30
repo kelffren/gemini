@@ -15,7 +15,7 @@ const LAUNCH_CURTAIN_ID='kelo-world-launch-curtain';
 const STUDIO_OPEN_MS=60000;
 const DEFAULT_LAUNCH_YIELD_MS=420;
 const DEFAULT_RUNTIME_YIELD_FALLBACK_MS=120;
-const WORLD_BUILD='world-tree-20260929';
+const WORLD_BUILD='world-tree-persist-20260930';
 const PHONE_RUNTIME_ROOTS=Object.freeze([
   '../../studio/input/pointer-input-adapter.mjs',
   '../../studio/input/studio-camera-controller.mjs',

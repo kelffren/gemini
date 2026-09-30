@@ -6,7 +6,7 @@
  * public-api: openKeloStudioLive(), closeKeloStudioLive()
  * consumes: KeloInputLocks, KELO_WORLD_EDIT, Studio Kernel/Tools
  * online: confirmed Commands mirror through KELO_WORLD_EDIT; previews/camera/productivity stay local
- * mobile: ZERO static Studio imports — chrome first; iPhone reuses the painted shell, skips overlay/grid/importCurrent on first paint, seeds a TREE-capable asset strip with paced thumbnails early, idle-slices productivity/extras, and never runs a blocking draft import on the first phone paint
+ * mobile: ZERO static Studio imports — chrome first; iPhone reuses the painted shell, skips overlay/grid on first paint, seeds a TREE-capable asset strip with paced thumbnails early, idle-slices productivity/extras, and hydrates saved placements after chrome without cloning terrain
  */
 
 let active=null;
@@ -398,23 +398,21 @@ export async function openKeloStudioLive({root=globalThis}={}){
     async function hydrateAfterChrome(){
       overlayStart=0;
       if(!running||root.KELO_WORLD_LAUNCH_ABORTED)return;
-      // A10 phone: auto importCurrent (structuredClone + draft snapshot) freezes WebContent
-      // even when delayed. Keep an empty editable document + TREE seed; draft can load later
-      // from desktop or an explicit reload path without blocking first paint survival.
-      if(phoneOverlay){
-        try{shell?.setStatus?.(`${mode.toUpperCase()} · listo · coloca assets`);}catch{}
-        updateShell();
-        return;
-      }
+      // A10 phone: a full structuredClone of terrain/collisions freezes WebContent.
+      // Saved placements still have to return, or a tree disappears after exit/reload.
+      // Hydrate the draft lite (placements only, no catalog reseed) after chrome paints.
       try{
-        await studio.importCurrent({view:'draft',draftId});
+        await studio.importCurrent({view:'draft',draftId,lite:true,placementsOnly:!!phoneOverlay,skipSeed:!!phoneOverlay});
         if(!running||root.KELO_WORLD_LAUNCH_ABORTED)return;
-        for(const e of studio.kernel.document.entities)mirror.seed(e.id,e.source?.authorityPlacementId||e.id);for(const c of Object.values(studio.kernel.document.navigation?.collisions||{}))mirror.seedCollision(c.collisionId,c.collisionId);
+        for(const e of studio.kernel.document.entities)mirror.seed(e.id,e.source?.authorityPlacementId||e.id);
+        for(const c of Object.values(studio.kernel.document.navigation?.collisions||{}))mirror.seedCollision(c.collisionId,c.collisionId);
         updateShell();
-        startStudioOverlayDraw();
+        if(shell?.root?.dataset)shell.root.dataset.keloWorldHydrated='1';
+        if(!phoneOverlay)startStudioOverlayDraw();
       }catch(error){
         console.warn('[Kelo Studio] draft import deferred; chrome stays up',error);
-        try{shell?.setStatus?.('Editor listo');}catch{}
+        if(shell?.root?.dataset)shell.root.dataset.keloWorldHydrated='0';
+        try{shell?.setStatus?.(phoneOverlay?`${mode.toUpperCase()} · listo · coloca assets`:'Editor listo');}catch{}
       }
     }
     onKey=e=>{if(isStudioUi(e))return;const key=e.key.toLowerCase();if(playing){if(key==='escape'){e.preventDefault();void guarded(togglePlaytest);}return;}if((e.metaKey||e.ctrlKey)&&key==='z'){e.preventDefault();void guarded(()=>e.shiftKey?studio.kernel.redo():studio.kernel.undo());return;}if((e.metaKey||e.ctrlKey)&&key==='d'){e.preventDefault();void guarded(()=>creator.duplicateSelection());return;}if((e.metaKey||e.ctrlKey)&&key==='c'){e.preventDefault();const count=creator.copySelection();productivity?.setClipboard(count);toast(root,count?`${count} objeto${count===1?'':'s'} copiado${count===1?'':'s'}`:'Selecciona algo para copiar');return;}if((e.metaKey||e.ctrlKey)&&key==='v'){e.preventDefault();void guarded(()=>creator.pasteClipboard());return;}if((e.metaKey||e.ctrlKey)&&key==='s'){e.preventDefault();void guarded(async()=>{await saveDraft();toast(root,'Studio guardado');});return;}if(key==='f'){e.preventDefault();focusSelection();return;}if(key==='+'||key==='='){e.preventDefault();cameraController.setZoom(cameraController.zoom*1.2);updateShell();return;}if(key==='-'){e.preventDefault();cameraController.setZoom(cameraController.zoom/1.2);updateShell();return;}if(key==='0'){e.preventDefault();cameraController.setZoom(1);updateShell();return;}if(key==='escape'){e.preventDefault();if(['camera','placement','prefab','terrain','path','collision'].includes(mode)){cancelTransient();setMode('select');}else void closeKeloStudioLive({root});return;}if(key==='r'){e.preventDefault();void guarded(()=>mode==='placement'?Promise.resolve(studio.tools.placement.rotate(90)):mode==='prefab'?Promise.resolve(null):creator.rotateSelection(90));return;}if(key==='e'&&(mode==='terrain'||mode==='path')){e.preventDefault();const next=!studio.tools.terrain.state().erase;studio.tools.terrain.configure({erase:next});shell?.setErase(next);updateShell();return;}if(key==='delete'||key==='backspace'){e.preventDefault();if(mode==='collision'&&studio.tools.collision.selectedId)void guarded(()=>studio.tools.collision.removeSelected());else void guarded(()=>creator.removeSelection());return;}if(key==='q')setMode('select');else if(key==='v')setMode('move');else if(key==='h')setMode(mode==='camera'?'select':'camera');else if(key==='g')setMode('terrain');else if(key==='p')setMode('path');else if(key==='c')setMode('collision');};root.document.addEventListener('keydown',onKey,true);
@@ -432,7 +430,7 @@ export async function openKeloStudioLive({root=globalThis}={}){
     active=Object.freeze(liveSession);root.document.body.classList.add('kelo-studio-active');toast(root,'Kelo Studio Creator V1.8 activo');
     if(phoneOverlay){
       try{shell?.setStatus?.(`${mode.toUpperCase()} · listo`);}catch{}
-      // A10: phone hydrate is status-only (no importCurrent). Run soon so UI says listo.
+      // A10: phone hydrate loads saved placements only (no terrain clone). Run after first paint.
       overlayStart=(root.setTimeout||setTimeout)(hydrateAfterChrome,400);
     }else overlayStart=(root.setTimeout||setTimeout)(hydrateAfterChrome,0);
     return active;

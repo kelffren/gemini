@@ -299,11 +299,15 @@ class LocalWorldEditAuthority{
     }
 
     if(op==='world:draft:save'){
-      const key=this._require('world.edit',actorId),d=this._requireMutableDraft(payload,actorId),before={savedAt:d.savedAt,revisionVersion:d.revisionVersion};
-      d.savedAt=now();d.updatedAt=now();
-      this._audit(op,{actorId,key,draftId:d.draftId,objectId:d.draftId,before,after:{savedAt:d.savedAt,revisionVersion:d.revisionVersion}});
+      const key=this._require('world.edit',actorId),d=this._requireMutableDraft(payload,actorId),before={savedAt:d.savedAt,revisionVersion:d.revisionVersion,placements:(d.snapshot?.placements||[]).length};
+      d.snapshot=d.snapshot||this.rev.normalizeSnapshot({worldId:WORLD_ID});
+      d.snapshot.placements=this.rev.normalizeSnapshot({placements:this._capturePlacements(),worldId:WORLD_ID}).placements;
+      d.snapshot.generatedAt=now();
+      d.savedAt=now();
+      this._touchDraft(d);
+      this._audit(op,{actorId,key,draftId:d.draftId,objectId:d.draftId,before,after:{savedAt:d.savedAt,revisionVersion:d.revisionVersion,placements:d.snapshot.placements.length}});
       this._persist();
-      return {draft:this._publicDraft(d),saved:true};
+      return this._reply({draft:this._publicDraft(d),saved:true,placementCount:d.snapshot.placements.length},d.snapshot,this._viewMeta('draft',d.draftId,{status:d.status,saved:true}),true);
     }
 
     if(op==='world:draft:discard'){

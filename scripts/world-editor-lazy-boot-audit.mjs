@@ -213,8 +213,9 @@ assert.match(entrySource,/registerCoreToolsSerial/,'iPhone World boot must regis
 assert.match(entrySource,/register-build-tools-serial\.mjs/,'iPhone optional tools must load build tools serially without barrels');
 assert.match(entrySource,/never import register-basic-tools/,'iPhone must document skipping register-basic-tools delayed freeze');
 
-assert.match(controllerSource,/hydrateAfterChrome,400/,'iPhone post-chrome hydrate is status-only and must not wait on importCurrent');
-assert.match(controllerSource,/A10 phone: auto importCurrent/,'iPhone must document why importCurrent is skipped');
+assert.match(controllerSource,/hydrateAfterChrome,400/,'iPhone hydrates the saved draft after chrome paints');
+assert.match(controllerSource,/placementsOnly:!!phoneOverlay/,'iPhone draft hydrate must load placements without cloning terrain');
+assert.match(controllerSource,/A10 phone:/,'iPhone must document why full terrain import is skipped');
 assert.match(controllerSource,/phoneSeedAssets/,'iPhone must seed a light TREE-capable asset strip');
 assert.match(controllerSource,/createPacedPhoneAssetPreview/,'iPhone must pace asset thumbnail decode instead of skipping preview forever');
 assert.match(controllerSource,/renderAssetPreview:phoneShell\?renderPhoneAssetPreview/,'iPhone must wire paced previews into the live shell');
