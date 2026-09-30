@@ -42,7 +42,7 @@ async function loadStudioCore(root,phoneBoot){
   }
   const seederMod=await isolatedImport('herramientas/catálogo','./adapters/catalog-prefab-seeder.mjs');
   const componentsMod=await isolatedImport('herramientas/componentes','./components/kelo-components.mjs');
-  const importerMod=await isolatedImport('herramientas/importador','./adapters/current-world-importer.mjs');
+  const importerMod=await isolatedImport('herramientas/importador','./adapters/current-world-importer.mjs?v=world-tree-persist-20260930');
   const previewMod=await isolatedImport('servicios/preview','./render/studio-asset-preview-service.mjs?v=semantic-brush-1');
   const storeMod=await isolatedImport('servicios/almacenamiento','./storage/indexeddb-studio-store.mjs');
   const profilerMod=await isolatedImport('servicios/profiler','./performance/studio-profiler.mjs');
@@ -398,7 +398,7 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
     get snapCycleController(){return snapCycleController;},
     compiler, worker, store, profiler, adapter,
     compile: options => profiler.measure('compile.sync', () => compiler.compile(kernel.document, options)), compileAsync: options => profiler.measure('compile.worker', () => worker.compile(kernel.document, options)),
-    async importCurrent(options={}) { const next=await profiler.measure('import.current',()=>importCurrentKeloWorld({adapter,mode,actorId,...options})); kernel.setDocument(next); seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:adapter.assetCatalog}); try{assetPalette.refresh();assetFavorites.refresh();multiAlign.refresh();historyHints.refresh();}catch{} return next; },
+    async importCurrent(options={}) { const {skipSeed=false,...importOptions}=options; const next=await profiler.measure('import.current',()=>importCurrentKeloWorld({adapter,mode,actorId,...importOptions})); kernel.setDocument(next); if(!skipSeed){seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:adapter.assetCatalog}); try{assetPalette.refresh();assetFavorites.refresh();multiAlign.refresh();historyHints.refresh();}catch{}} return next; },
     checkpoint: () => store.saveCheckpoint(kernel.document.worldId,kernel.document), recover: () => store.loadRecovery(kernel.document.worldId),
     close(){
       closed=true;

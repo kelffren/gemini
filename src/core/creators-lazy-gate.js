@@ -16,9 +16,9 @@ const VERSION='kelo-creators-lazy-gate-v9.1-world-handoff';
 const OPEN_CREATOR_ACCESS=true;
 // iOS standalone can keep an old launcher in HTTP cache or in the resumed window.
 // Use a new URL and evict only a stale launcher that still reports access=false.
-const LAUNCHER_SRC='src/ui/studio-launcher.js?v=world-tree-20260929';
+const LAUNCHER_SRC='src/ui/studio-launcher.js?v=world-tree-persist-20260930';
 const ASSET_CATALOG_SRC='src/property/property-asset-catalog.js?v=creator-assets-20260915-1';
-const assetForgeModuleUrl=()=>new URL('src/creators/creator-entry.mjs?v=world-tree-20260929',root.document?.baseURI||root.location.href).href;
+const assetForgeModuleUrl=()=>new URL('src/creators/creator-entry.mjs?v=world-tree-persist-20260930',root.document?.baseURI||root.location.href).href;
 let loading=null,catalogLoading=null,forgeLoading=null;
 const query=()=>{try{return new URLSearchParams(root.location.search);}catch(_){return new URLSearchParams();}};
 const directRequested=()=>query().get('creators')==='1'||query().get('creator')==='1'||query().get('mapEditor')==='1';
