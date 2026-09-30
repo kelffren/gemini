@@ -11,7 +11,7 @@
 import { createBugObserver } from '../../core/bug-observability.mjs';
 import { yieldStudioBoot, setWorldLaunchStatus } from './studio-boot-pace.mjs';
 
-export const WORLD_STUDIO_BRIDGE_BUILD='world-tree-visible-20260930c';
+export const WORLD_STUDIO_BRIDGE_BUILD='world-open-stay-20260930';
 const bridgeUrl=new URL(import.meta.url);
 const incomingBuild=bridgeUrl.searchParams.get('v')||'';
 // Workspace can lag one or more static build tags behind this bridge. Do not let

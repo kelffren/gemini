@@ -15,7 +15,7 @@ const LAUNCH_CURTAIN_ID='kelo-world-launch-curtain';
 const STUDIO_OPEN_MS=60000;
 const DEFAULT_LAUNCH_YIELD_MS=420;
 const DEFAULT_RUNTIME_YIELD_FALLBACK_MS=120;
-const WORLD_BUILD='world-tree-visible-20260930c';
+const WORLD_BUILD='world-open-stay-20260930';
 const PHONE_RUNTIME_ROOTS=Object.freeze([
   '../../studio/input/pointer-input-adapter.mjs',
   '../../studio/input/studio-camera-controller.mjs',
@@ -209,6 +209,14 @@ async function withTimeout(root,promise,ms,code){
   try{return await Promise.race([promise,timeout]);}
   finally{if(timer!=null)cancel(timer);}
 }
+async function ensureOpenCreatorKey(root){
+  const keys=root?.KELO_ADMIN_KEYS;
+  if(!keys?.request||!keys?.can)return false;
+  const actorId=actor(root);
+  if(keys.can('world.edit',actorId))return true;
+  try{await keys.request('admin-key:ensure-open-creator',{actorId,ownerId:actorId,openAccess:true});}catch{}
+  return !!keys.can('world.edit',actorId);
+}
 async function openMountedStudio(mod,root){
   let session=await mod.openKeloStudioLive({root});
   if(studioShellMounted(root))return session;
@@ -224,7 +232,7 @@ async function ensureWorldPlacementRuntime(root){
   if(root?.KELO_PROPERTY_SYSTEM?.request)return root.KELO_PROPERTY_SYSTEM;
   // KELO-INDEX WORLD/PROPERTY asegura el owner del placement aunque World se toque antes de post-boot streaming.
   if(typeof root?.KELO_MODULE_LOADER?.ensure!=='function' && root===globalThis){
-    await import('../../core/module-loader.js?v=world-tree-visible-20260930c');
+    await import('../../core/module-loader.js?v=world-open-stay-20260930');
   }
   const loader=root?.KELO_MODULE_LOADER;
   if(typeof loader?.ensure!=='function')throw new Error('WORLD_EDITOR_PROPERTY_LOADER_UNAVAILABLE');
@@ -276,6 +284,7 @@ export function createWorldWorkspaceManifest({loader=()=>import(`../../studio/in
       const failsafe=failsafeWait(()=>resumeRender(),800);
       try{
         try{root.KELO_WORLD_LAUNCH_ABORTED=false;}catch{}
+        await ensureOpenCreatorKey(root);
         const boot=async()=>{
           if(root.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
           if(!previewOnly){
