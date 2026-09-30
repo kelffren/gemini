@@ -16,9 +16,9 @@ const VERSION='kelo-creators-lazy-gate-v9.1-world-handoff';
 const OPEN_CREATOR_ACCESS=true;
 // iOS standalone can keep an old launcher in HTTP cache or in the resumed window.
 // Use a new URL and evict only a stale launcher that still reports access=false.
-const LAUNCHER_SRC='src/ui/studio-launcher.js?v=world-tree-visible-20260930c';
+const LAUNCHER_SRC='src/ui/studio-launcher.js?v=world-open-stay-20260930';
 const ASSET_CATALOG_SRC='src/property/property-asset-catalog.js?v=creator-assets-20260915-1';
-const assetForgeModuleUrl=()=>new URL('src/creators/creator-entry.mjs?v=world-tree-visible-20260930c',root.document?.baseURI||root.location.href).href;
+const assetForgeModuleUrl=()=>new URL('src/creators/creator-entry.mjs?v=world-open-stay-20260930',root.document?.baseURI||root.location.href).href;
 let loading=null,catalogLoading=null,forgeLoading=null;
 const query=()=>{try{return new URLSearchParams(root.location.search);}catch(_){return new URLSearchParams();}};
 const directRequested=()=>query().get('creators')==='1'||query().get('creator')==='1'||query().get('mapEditor')==='1';
@@ -136,6 +136,17 @@ async function openAssetForge(){
   })().finally(function(){forgeLoading=null;paintForge(document.getElementById('lx-create-asset-forge'),false);sync();});
   return forgeLoading;
 }
+async function ensureOpenCreatorKey(){
+  if(!OPEN_CREATOR_ACCESS)return false;
+  const keys=root.KELO_ADMIN_KEYS;
+  if(!keys?.request||!keys?.can)return false;
+  const who=actor();
+  if(keys.can('world.edit',who))return true;
+  try{
+    await keys.request('admin-key:ensure-open-creator',{actorId:who,ownerId:who,openAccess:true});
+  }catch(error){console.warn('[Kelo Creators] open creator key',error);}
+  return !!keys.can('world.edit',who);
+}
 async function open(){
   if(!allowed()){
     if(directRequested()&&query().get('mapEditor')==='1'&&root.KELO_ADMIN_KEYS?.request){
@@ -143,6 +154,7 @@ async function open(){
     }
   }
   if(!allowed()){toast('Necesitas acceso a Kelo Creators');return false;}
+  await ensureOpenCreatorKey();
   const btn=document.getElementById('lx-create-studio');paint(btn,true);
   try{
     clearStaleStudioState();

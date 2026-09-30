@@ -9,9 +9,9 @@
   if(root.KELO_POST_BOOT_STREAMER)return;
   const VERSION='kelo-post-boot-streamer-v2.1-world-handoff';
   const FILES=[
-    'src/core/feature-registry.js?v=world-tree-visible-20260930c',
+    'src/core/feature-registry.js?v=world-open-stay-20260930',
     'src/core/asset-registry.js?v=2-feature-registry',
-    'src/core/module-loader.js?v=world-tree-visible-20260930c',
+    'src/core/module-loader.js?v=world-open-stay-20260930',
     'src/ui/asset-library-launcher.js?v=12-place-first',
     'src/core/settings-lazy-gate.js?v=3-update-intel',
     'src/core/hot-data-registry.js?v=1-transactional',
@@ -24,10 +24,10 @@
     'src/core/update-gate.js?v=8-hot-data',
     'src/core/session-continuity-system.js?v=2-update-classes',
     'src/core/session-continuity-retry.js?v=1-event-driven',
-    'src/systems/admin-key-system.js?v=1',
+    'src/systems/admin-key-system.js?v=world-open-stay-20260930',
     'src/core/admin-control-lazy-gate.js?v=2',
     'src/core/account-live-control-gate.js?v=2',
-    'src/core/creators-lazy-gate.js?v=world-tree-visible-20260930c'
+    'src/core/creators-lazy-gate.js?v=world-open-stay-20260930'
   ];
   const audit=root.KELO_INSTANT_BOOT_AUDIT={version:VERSION,startedAt:0,firstYieldAt:0,loaded:0,total:FILES.length,ready:false,failed:[]};
 

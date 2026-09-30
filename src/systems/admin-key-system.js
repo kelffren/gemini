@@ -7,7 +7,7 @@
 (function(){
 'use strict';
 
-const VERSION='admin-key-v1.6.0-online-scopes';
+const VERSION='admin-key-v1.6.1-open-creator';
 const SCHEMA=1;
 const STORAGE='kelo_admin_keys_v1';
 const TEMPLATE_ID='admin-key';
@@ -67,6 +67,21 @@ async function localRequest(op,payload){
     const ownerId=String(data.ownerId||actorId);let k=activeKeys(ownerId).find(x=>(x.scopes||[]).includes('admin.issue'));
     if(!k){const keyId=newId();state.keys[keyId]={schema:1,keyId,templateId:TEMPLATE_ID,ownerId,label:'Llave Admin · Propietario',scopes:Array.from(ROOT_SCOPES),active:true,issuedBy:'offline-bootstrap',createdAt:now(),revokedAt:null};bump();k=state.keys[keyId];}
     else if(ensureScopes(k,ROOT_SCOPES))bump();
+    return publicKey(k);
+  }
+  // Creators is temporarily open to every player. Hub already treats world.edit as allowed,
+  // but Studio and the world authority still require a real local key. Grant creator scopes
+  // only (not publish / admin.issue) so World stays open instead of bouncing back to the hub.
+  if(op==='admin-key:ensure-open-creator'){
+    if(data.openAccess!==true)throw new Error('LOCAL_BOOTSTRAP_DISABLED');
+    const ownerId=String(data.ownerId||actorId);
+    let k=activeKeys(ownerId).find(x=>(x.scopes||[]).includes('world.edit'))||activeKeys(ownerId)[0]||null;
+    if(!k){
+      const keyId=newId();
+      state.keys[keyId]={schema:1,keyId,templateId:TEMPLATE_ID,ownerId,label:'Llave Admin · Creador',scopes:Array.from(DEFAULT_CREATOR_SCOPES),active:true,issuedBy:'open-creator-access',createdAt:now(),revokedAt:null};
+      bump();
+      k=state.keys[keyId];
+    }else if(ensureScopes(k,DEFAULT_CREATOR_SCOPES))bump();
     return publicKey(k);
   }
   throw new Error('UNKNOWN_ADMIN_KEY_OPERATION');

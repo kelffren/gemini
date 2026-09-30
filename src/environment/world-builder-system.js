@@ -95,11 +95,11 @@ function loadScriptOnce(id,src){
 }
 async function loadAuthorityStack(){
   if(window.KELO_WORLD_EDIT)return true;
-  await loadScriptOnce('kelo-world-draft-store-loader','src/world/world-draft-store.js?v=world-tree-visible-20260930c');
-  await loadScriptOnce('kelo-world-revision-system-loader','src/world/world-revision-system.js?v=world-tree-visible-20260930c');
-  await loadScriptOnce('kelo-local-world-edit-authority-loader','src/world/authorities/local-world-edit-authority.js?v=world-tree-visible-20260930c');
-  await loadScriptOnce('kelo-remote-world-edit-authority-loader','src/world/authorities/remote-world-edit-authority.js?v=world-tree-visible-20260930c');
-  await loadScriptOnce('kelo-world-edit-authority-loader','src/world/world-edit-authority.js?v=world-tree-visible-20260930c');
+  await loadScriptOnce('kelo-world-draft-store-loader','src/world/world-draft-store.js?v=world-open-stay-20260930');
+  await loadScriptOnce('kelo-world-revision-system-loader','src/world/world-revision-system.js?v=world-open-stay-20260930');
+  await loadScriptOnce('kelo-local-world-edit-authority-loader','src/world/authorities/local-world-edit-authority.js?v=world-open-stay-20260930');
+  await loadScriptOnce('kelo-remote-world-edit-authority-loader','src/world/authorities/remote-world-edit-authority.js?v=world-open-stay-20260930');
+  await loadScriptOnce('kelo-world-edit-authority-loader','src/world/world-edit-authority.js?v=world-open-stay-20260930');
   return true;
 }
 

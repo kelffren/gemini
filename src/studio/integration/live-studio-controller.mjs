@@ -226,7 +226,11 @@ export async function openKeloStudioLive({root=globalThis}={}){
     await closeKeloStudioLive({root});
   }
   if(!root.document)throw new Error('STUDIO_DOM_REQUIRED');
-  const actorId=actor(root);if(!root.KELO_ADMIN_KEYS?.can?.('world.edit',actorId))throw new Error('ADMIN_KEY_PERMISSION_DENIED');if(root.KELO_WORLD_BUILDER?.isMainWorld&&!root.KELO_WORLD_BUILDER.isMainWorld())throw new Error('STUDIO_MAIN_WORLD_ONLY');if(!root.KeloInputLocks?.acquire||!root.KeloInputLocks?.release)throw new Error('STUDIO_INPUT_LOCKS_NOT_READY');
+  const actorId=actor(root);
+  if(!root.KELO_ADMIN_KEYS?.can?.('world.edit',actorId)){
+    try{await root.KELO_ADMIN_KEYS?.request?.('admin-key:ensure-open-creator',{actorId,ownerId:actorId,openAccess:true});}catch{}
+  }
+  if(!root.KELO_ADMIN_KEYS?.can?.('world.edit',actorId))throw new Error('ADMIN_KEY_PERMISSION_DENIED');if(root.KELO_WORLD_BUILDER?.isMainWorld&&!root.KELO_WORLD_BUILDER.isMainWorld())throw new Error('STUDIO_MAIN_WORLD_ONLY');if(!root.KeloInputLocks?.acquire||!root.KeloInputLocks?.release)throw new Error('STUDIO_INPUT_LOCKS_NOT_READY');
   try{await root.KELO_WORLD_BUILDER_UI?.close?.(false);}catch{}
   if(root.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
   const createStudioLiveShell=await loadLiveStudioChrome();

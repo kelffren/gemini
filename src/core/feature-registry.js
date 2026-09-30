@@ -63,7 +63,7 @@ const raw={
   market:{dependencies:[],policy:'first-use',files:[{src:'src/systems/market-escrow-system.js?v=1',name:'mercado'},{src:'src/ui/market-ui.js?v=2',name:'mercado'}]},
   titles:{dependencies:[],policy:'first-use',files:[{src:'src/systems/title-catalog.js?v=1',name:'títulos'},{src:'src/systems/player-stats.js?v=1',name:'títulos'},{src:'src/systems/title-system.js?v=1',name:'títulos'}]},
   appearance:{dependencies:[],policy:'first-use',files:[{src:'src/characters/character-customization.js?v=1',name:'apariencia'},{src:'src/ui/character-customizer-ui.js?v=1',name:'apariencia'}]},
-  properties:{dependencies:[],policy:'first-use',files:[{src:'src/property/property-system.js?v=world-tree-visible-20260930c',name:'propiedades'},{src:'src/ui/house-instance-ui.js?v=1',name:'propiedades'}]}
+  properties:{dependencies:[],policy:'first-use',files:[{src:'src/property/property-system.js?v=world-open-stay-20260930',name:'propiedades'},{src:'src/ui/house-instance-ui.js?v=1',name:'propiedades'}]}
 };
 const ALIASES=Object.freeze({nobility:'social',emotes:'social'});
 const definitions=Object.create(null);
