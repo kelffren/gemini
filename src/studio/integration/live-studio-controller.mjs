@@ -336,7 +336,7 @@ export async function openKeloStudioLive({root=globalThis}={}){
           if(first?.id){
             try{shell.setSelectedAsset?.(first.id,{compact:false});}catch{}
           }
-          if(openSheet){
+          if(openSheet && shell.root?.dataset.keloSheetPinned!=='1'){
             try{shell.openAssets?.();}catch{}
           }
           updateShell();
@@ -358,7 +358,11 @@ export async function openKeloStudioLive({root=globalThis}={}){
         const n=(allAssets()||[]).length;
         if(n>4)paintSeed('refresh',{openSheet:true});
       },2400);
-      shell.root.addEventListener('click',e=>{if(e.target?.closest?.('[data-act="edit-assets"]'))loadFullAssets();},{capture:true});
+      shell.root.addEventListener('click',e=>{
+        if(e.target?.closest?.('[data-act="edit-assets"]'))loadFullAssets();
+        const tab=e.target?.closest?.('[data-tab]');
+        if(tab?.dataset?.tab && tab.dataset.tab!=='assets') shell.root.dataset.keloSheetPinned='1';
+      },{capture:true});
       void immediate;
     }
     if(root.KELO_WORLD_LAUNCH_ABORTED)throw new Error('WORLD_EDITOR_OPEN_TIMEOUT');
