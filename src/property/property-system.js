@@ -129,6 +129,15 @@
   function bounds(){return state.placements.filter(placementVisible).map(p=>({id:p.placementId,...placementBounds(p)})).filter(x=>x.w>0&&x.h>0);}
   L.register({id:'property-placements-back',phase:'props_back',priority:35,required:false,ready:()=>true,draw:g=>drawPhase(g,'props_back'),ownership:'property-placement-system-v1',bounds});
   L.register({id:'property-placements-front',phase:'props_front',priority:35,required:false,ready:()=>true,draw:g=>drawPhase(g,'props_front'),ownership:'property-placement-system-v1',bounds});
+  // World-editor props are authored in props_back, which the plaza fountain (props_front) covers.
+  // Redraw them after props_front and before the day tint so a placed tree stays visible on the plaza.
+  function drawEditorOverlay(g){
+    const rows=state.placements.filter(rec=>parcel(rec.parcelId)?.kind==='world_editor'&&placementVisible(rec));
+    if(!rows.length)return;
+    drawPlacements(g,rows,'props_back');
+    drawPlacements(g,rows,'props_front');
+  }
+  L.register({id:'property-editor-overlay',phase:'vfx_weather_lighting',priority:80,required:false,visibleDuringReset:true,ready:()=>true,draw:drawEditorOverlay,ownership:'property-placement-system-v1',bounds});
 
   function announceAssetReady(key){try{window.dispatchEvent(new CustomEvent('kelo:property-render-assets-ready',{detail:{key}}));}catch(e){}}
   function acquire(key){if(readyAssets.has(key)||loadingAssets.has(key))return;loadingAssets.add(key);A.acquire(key).then(img=>{images.set(key,img);readyAssets.add(key);loadingAssets.delete(key);announceAssetReady(key);}).catch(err=>console.warn('[Kelo property] asset unavailable',key,err));}
@@ -138,7 +147,7 @@
   function suppressLegacyFurniture(plot){const p=state.parcels['parcel:legacy:104'];return !!p&&p.bounds.x===plot?.x&&p.bounds.y===plot?.y&&state.placements.some(x=>x.parcelId===p.parcelId);}
   if(typeof renderPlot==='function'){const legacyRenderPlot=renderPlot;renderPlot=function(plot,isOwn){if(suppressLegacyFurniture(plot))return legacyRenderPlot(Object.assign({},plot,{furniture:[]}),isOwn);return legacyRenderPlot(plot,isOwn);};}
   window.KELO_PROPERTY_SYSTEM=Object.freeze({
-    version:'property-system-v1.4.0',storageMode:'local-fallback-replaceable',collisionOwner:COLLISION_OWNER,request,authorityLocalRequest:localRequest,installRemoteAdapter,ingestAuthoritySnapshot,snapshot,playerId,parcel,getOwnedUnits:(assetId,owner)=>owned(String(owner||playerId()),assetId),getDeployedUnits:(assetId,owner)=>deployed(String(owner||playerId()),assetId),getAvailableUnits:(assetId,owner)=>available(String(owner||playerId()),assetId),getPlacements:(pid)=>state.placements.filter(p=>!pid||p.parcelId===pid).map(clone),placementBounds,placementForPoint,drawPlacements,exportLayout,suppressLegacyFurniture,refreshSceneColliders:syncColliders,onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},get ready(){return true;}
+    version:'property-system-v1.4.1',storageMode:'local-fallback-replaceable',collisionOwner:COLLISION_OWNER,request,authorityLocalRequest:localRequest,installRemoteAdapter,ingestAuthoritySnapshot,snapshot,playerId,parcel,getOwnedUnits:(assetId,owner)=>owned(String(owner||playerId()),assetId),getDeployedUnits:(assetId,owner)=>deployed(String(owner||playerId()),assetId),getAvailableUnits:(assetId,owner)=>available(String(owner||playerId()),assetId),getPlacements:(pid)=>state.placements.filter(p=>!pid||p.parcelId===pid).map(clone),placementBounds,placementForPoint,drawPlacements,exportLayout,suppressLegacyFurniture,refreshSceneColliders:syncColliders,onChange(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);return()=>listeners.delete(fn);},get ready(){return true;}
   });
-  window.KELO_PROPERTY_AUDIT={version:'property-system-v1.4.0',schema:SCHEMA,authority:'local-fallback',serverReplaceable:true,collisionMode:'kelo-collision-owner-v2',collisionOwner:COLLISION_OWNER,parcelCount:Object.keys(state.parcels).length,placementCount:state.placements.length,assetCount:C.list().length,readOnlyPreviewRenderer:true};
+  window.KELO_PROPERTY_AUDIT={version:'property-system-v1.4.1',schema:SCHEMA,authority:'local-fallback',serverReplaceable:true,collisionMode:'kelo-collision-owner-v2',collisionOwner:COLLISION_OWNER,parcelCount:Object.keys(state.parcels).length,placementCount:state.placements.length,assetCount:C.list().length,readOnlyPreviewRenderer:true};
 })();

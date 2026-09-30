@@ -42,7 +42,7 @@ async function loadStudioCore(root,phoneBoot){
   }
   const seederMod=await isolatedImport('herramientas/catálogo','./adapters/catalog-prefab-seeder.mjs');
   const componentsMod=await isolatedImport('herramientas/componentes','./components/kelo-components.mjs');
-  const importerMod=await isolatedImport('herramientas/importador','./adapters/current-world-importer.mjs?v=world-tree-persist-20260930b');
+  const importerMod=await isolatedImport('herramientas/importador','./adapters/current-world-importer.mjs?v=world-tree-visible-20260930c');
   const previewMod=await isolatedImport('servicios/preview','./render/studio-asset-preview-service.mjs?v=semantic-brush-1');
   const storeMod=await isolatedImport('servicios/almacenamiento','./storage/indexeddb-studio-store.mjs');
   const profilerMod=await isolatedImport('servicios/profiler','./performance/studio-profiler.mjs');

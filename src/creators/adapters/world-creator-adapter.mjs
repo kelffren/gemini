@@ -11,10 +11,10 @@ const mapStatus=status=>({DRAFT:'TEAM_DRAFT',SUBMITTED:'IN_REVIEW',APPROVED:'APP
 const revisionIdOf=d=>d?.publishedRevisionId||d?.revisionId||d?.baseRevisionId||null;
 
 const DEFAULT_WORLD_EDIT_LOADERS=Object.freeze([
-  ()=>import('../../world/world-draft-store.js?v=world-tree-persist-20260930b'),
-  ()=>import('../../world/world-revision-system.js?v=world-tree-persist-20260930b'),
-  ()=>import('../../world/authorities/local-world-edit-authority.js?v=world-tree-persist-20260930b'),
-  ()=>import('../../world/world-edit-authority.js?v=world-tree-persist-20260930b')
+  ()=>import('../../world/world-draft-store.js?v=world-tree-visible-20260930c'),
+  ()=>import('../../world/world-revision-system.js?v=world-tree-visible-20260930c'),
+  ()=>import('../../world/authorities/local-world-edit-authority.js?v=world-tree-visible-20260930c'),
+  ()=>import('../../world/world-edit-authority.js?v=world-tree-visible-20260930c')
 ]);
 let worldEditBootstrapPromise=null;
 

@@ -15,7 +15,7 @@ const LAUNCH_CURTAIN_ID='kelo-world-launch-curtain';
 const STUDIO_OPEN_MS=60000;
 const DEFAULT_LAUNCH_YIELD_MS=420;
 const DEFAULT_RUNTIME_YIELD_FALLBACK_MS=120;
-const WORLD_BUILD='world-tree-persist-20260930b';
+const WORLD_BUILD='world-tree-visible-20260930c';
 const PHONE_RUNTIME_ROOTS=Object.freeze([
   '../../studio/input/pointer-input-adapter.mjs',
   '../../studio/input/studio-camera-controller.mjs',
@@ -224,7 +224,7 @@ async function ensureWorldPlacementRuntime(root){
   if(root?.KELO_PROPERTY_SYSTEM?.request)return root.KELO_PROPERTY_SYSTEM;
   // KELO-INDEX WORLD/PROPERTY asegura el owner del placement aunque World se toque antes de post-boot streaming.
   if(typeof root?.KELO_MODULE_LOADER?.ensure!=='function' && root===globalThis){
-    await import('../../core/module-loader.js?v=10-feature-registry');
+    await import('../../core/module-loader.js?v=world-tree-visible-20260930c');
   }
   const loader=root?.KELO_MODULE_LOADER;
   if(typeof loader?.ensure!=='function')throw new Error('WORLD_EDITOR_PROPERTY_LOADER_UNAVAILABLE');
