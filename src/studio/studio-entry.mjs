@@ -82,10 +82,9 @@ const NOOP_ASSET_PALETTE=Object.freeze({
 });
 const NOOP_ASSET_FAVORITES=Object.freeze({refresh:()=>{},destroy:()=>{},toggle:()=>false,get ids(){return [];}});
 const NOOP_CTRL=Object.freeze({destroy(){},refresh(){}});
-// A11: preview/catalog UI early; heavy optional tools + extras later and idle-sliced.
-const PHONE_PREVIEW_BOOT_DELAY_MS=1200;
-const PHONE_OPTIONAL_BOOT_DELAY_MS=45000;
-const PHONE_PRODUCTIVITY_BOOT_DELAY_MS=55000;
+// Phone keeps the live shell only. The delayed palette, build tools and extras
+// install document-wide observers plus backdrop-filter and freeze iOS after the editor is already open.
+const PHONE_SKIP_DEFERRED_WAVES=true;
 
 function isPhoneStudioBoot(root){
   const ua=String(root?.navigator?.userAgent||'');
@@ -295,7 +294,7 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
       }
     })();
   };
-  optionalToolsTimer=deferStudioOptional(root,()=>{optionalToolsTimer=0;loadBasicTools();},phoneBoot?PHONE_OPTIONAL_BOOT_DELAY_MS:0);
+  if(!phoneBoot)optionalToolsTimer=deferStudioOptional(root,()=>{optionalToolsTimer=0;loadBasicTools();},0);
   const assetPreview=createStudioAssetPreviewService({assetCatalog:adapter.assetCatalog,atlasContract:root.KELO_ATLAS_CONTRACT,devicePixelRatio:phoneBoot?1:(globalThis.devicePixelRatio||1)});
   const overlayRenderer = createStudioOverlayRenderer?createStudioOverlayRenderer({ kernel, tools, assetPreview }):{draw(){}};
   const paletteAssets=()=>{
@@ -319,28 +318,12 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
       console.warn('[Kelo Studio] optional asset palette unavailable; continuing without it',error);
     });
   };
-  optionalPaletteTimer=deferStudioOptional(root,()=>{optionalPaletteTimer=0;loadAssetPalette();},phoneBoot?PHONE_PREVIEW_BOOT_DELAY_MS:0);
+  if(!phoneBoot)optionalPaletteTimer=deferStudioOptional(root,()=>{optionalPaletteTimer=0;loadAssetPalette();},0);
   const placementTouchController=createStudioPlacementTouchController({root,placement:tools.placement});
   // Explorer range is keyboard/desktop-heavy; keep a noop on phone until extras wave.
   let explorerRangeSelectionController=phoneBoot
     ? {destroy(){},refresh(){}}
     : createStudioExplorerRangeSelectionController({root,kernel});
-  if(phoneBoot){
-    deferStudioOptional(root,()=>{
-      if(closed)return;
-      void (async()=>{
-        try{
-          const pace=await import('./integration/studio-boot-pace.mjs');
-          await pace.whenStudioIdle(root,{timeoutMs:600});
-          await pace.pauseStudioBoot(root,40);
-          if(closed)return;
-          const mod=await import('./input/studio-explorer-range-selection-controller.mjs');
-          if(closed||typeof mod.createStudioExplorerRangeSelectionController!=='function')return;
-          explorerRangeSelectionController=mod.createStudioExplorerRangeSelectionController({root,kernel});
-        }catch{}
-      })();
-    },PHONE_PRODUCTIVITY_BOOT_DELAY_MS);
-  }
   let assetFavorites=NOOP_ASSET_FAVORITES;
   let assetKeyboardController=NOOP_CTRL;
   let menuMinimizer=NOOP_CTRL;
@@ -437,7 +420,7 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
     snapCycleController=next.snapCycleController;
     try{assetPalette.refresh();assetFavorites.refresh();multiAlign.refresh();historyHints.refresh();}catch{}
   };
-  extrasTimer=deferStudioOptional(root,()=>{
+  if(!phoneBoot||!PHONE_SKIP_DEFERRED_WAVES)extrasTimer=deferStudioOptional(root,()=>{
     extrasTimer=0;
     if(closed)return;
     void (async()=>{
@@ -454,7 +437,7 @@ export async function bootKeloStudio({ mode = 'world', actorId = null, document 
         console.warn('[Kelo Studio] optional productivity extras unavailable; World editor stays usable',error);
       }
     })();
-  }, phoneBoot?PHONE_PRODUCTIVITY_BOOT_DELAY_MS:0);
+  }, 0);
   return session;
 }
 export function getKeloStudioSession(){return session;}

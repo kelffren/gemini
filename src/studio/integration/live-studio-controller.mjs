@@ -154,18 +154,9 @@ function ensurePhonePlacementPrefabs(studio,assets){
 
 
 function createPacedPhoneAssetPreview(assetPreview,root){
-  // Serial thumbnail decode with yields — keeps strip/library preview without a main-thread spike.
+  // Serial thumbnail decode with yields. Never read pixels back: getImageData stalls iPhone.
   let queue=[],busy=false,token=0;
   const wait=ms=>new Promise(r=>(root.setTimeout||setTimeout)(r,ms));
-  function canvasHasInk(canvas){
-    try{
-      const ctx=canvas.getContext('2d');
-      if(!ctx||!canvas.width||!canvas.height)return false;
-      const {data}=ctx.getImageData(0,0,Math.min(canvas.width,12),Math.min(canvas.height,12));
-      for(let i=3;i<data.length;i+=4)if(data[i]>10)return true;
-    }catch{}
-    return false;
-  }
   function drawFallback(canvas,asset,cssSize=48){
     if(!canvas?.getContext)return;
     const size=Math.max(32,Number(cssSize)||48);
@@ -191,9 +182,10 @@ function createPacedPhoneAssetPreview(assetPreview,root){
       if(!job||job.token!==token)continue;
       try{
         await assetPreview.renderThumbnail(job.canvas,job.asset,{cssSize:job.cssSize||48});
-      }catch{}
-      if(!canvasHasInk(job.canvas))drawFallback(job.canvas,job.asset,job.cssSize||48);
-      await wait(job.priority?12:28);
+      }catch{
+        try{drawFallback(job.canvas,job.asset,job.cssSize||48);}catch{}
+      }
+      await wait(job.priority?16:36);
     }
     busy=false;
   }
@@ -265,8 +257,21 @@ export async function openKeloStudioLive({root=globalThis}={}){
   };
   let draftId=draft.draftId;const mirror=installStudioAuthorityMirror({adapter:studio.adapter,actorId,getDraftId:()=>draftId});
   let inputLockToken=null,overlay=null,overlayStart=0,shell=null,productivity=null,cameraController=null,unregisterInput=null,detachPointer=null,selectionUnsub=null,frame=0,running=true,playing=false,mode='select',dragEntity=null,directGesture=null,onKey=null,pinchScale=null,pinchPreviewFrame=0,pinchPreviewPending=null,pinchPreviewChain=Promise.resolve();
+  const simHold={token:null};
+  const holdWorldSim=()=>{
+    if(simHold.token)return;
+    try{simHold.token=root.KeloSimulation?.suspend?.('world-editor',{reason:'studio-session'})||null;}catch{simHold.token=null;}
+  };
+  const releaseWorldSim=()=>{
+    const token=simHold.token;simHold.token=null;
+    try{
+      if(token&&root.KeloSimulation?.resume)root.KeloSimulation.resume(token);
+      else root.KeloSimulation?.resumeOwner?.('world-editor');
+    }catch{}
+  };
   try{
     inputLockToken=root.KeloInputLocks.acquire('kelo-studio',{kind:'creator-session',draftId});
+    holdWorldSim();
     const baseAssets=studio.adapter.assetCatalog.list()||[],allAssets=()=>[...baseAssets,...prefabLibrary.assets()];
     const materials=Array.from(new Set([...(root.KELO_WORLD_BUILDER?.materials||[]),...Object.keys(root.KELO_TERRAIN_CONTRACT?.materials||{})])),groundMaterial=materials.includes('grass')?'grass':materials[0]||'grass',pathMaterial=materials.includes('marble')?'marble':materials[1]||materials[0]||'grass';
     let snapSize=Math.max(1,Number(studio.kernel.document.settings?.tileSize)||32);const gridOverlay=createCreatorGridOverlay({size:snapSize,visible:true});
@@ -298,7 +303,7 @@ export async function openKeloStudioLive({root=globalThis}={}){
     async function endDirectGesture({cancelled=false}={}){const g=directGesture;directGesture=null;if(!g)return null;if(g.kind!=='object')return null;if(cancelled||!g.moved){studio.tools.transform.cancel();return null;}return studio.tools.transform.commit();}
     function focusSelection(){const rect=selectionRect();if(!rect){toast(root,'Selecciona algo para enfocar');return;}cameraController?.focusRect(rect,{padding:120});updateShell();}
     function setPlayChrome(on){const r=shell?.root;if(!r)return;for(const sel of ['.ks-left','.ks-right','.ks-bottom']){const el=r.querySelector(sel);if(el)el.style.display=on?'none':'';}const b=r.querySelector('[data-act="play"]');if(b)b.textContent=on?'■ EDIT':'▶ PLAY';if(overlay?.canvas)overlay.canvas.style.display=on?'none':'';}
-    async function togglePlaytest(){if(!playing){await saveDraft();playing=true;cancelDirectGesture();cameraController?.suspend();if(inputLockToken){root.KeloInputLocks.release(inputLockToken);inputLockToken=null;}setPlayChrome(true);toast(root,'Playtest activo · toca EDIT para volver');}else{inputLockToken=root.KeloInputLocks.acquire('kelo-studio',{kind:'creator-session',draftId});playing=false;cameraController?.resume();cameraController?.setPanMode(mode==='camera');setPlayChrome(false);toast(root,'Modo edición');}updateShell();}
+    async function togglePlaytest(){if(!playing){await saveDraft();playing=true;releaseWorldSim();cancelDirectGesture();cameraController?.suspend();if(inputLockToken){root.KeloInputLocks.release(inputLockToken);inputLockToken=null;}setPlayChrome(true);toast(root,'Playtest activo · toca EDIT para volver');}else{inputLockToken=root.KeloInputLocks.acquire('kelo-studio',{kind:'creator-session',draftId});playing=false;holdWorldSim();cameraController?.resume();cameraController?.setPanMode(mode==='camera');setPlayChrome(false);toast(root,'Modo edición');}updateShell();}
     function cancelForCamera(){dragEntity=null;cancelDirectGesture();studio.tools.transform.cancel();studio.tools.marquee.cancel();if(studio.tools.terrain.state().stroke)studio.tools.terrain.cancel();studio.tools.collision.cancel();}
     cameraController=createStudioCameraController({root,isUi:isStudioUi,onNavigateStart:cancelForCamera,onPinchStart:payload=>mode==='select'?false:beginPinchScale(payload),onPinchMove:movePinchScale,onPinchEnd:payload=>{void guarded(()=>endPinchScale(payload));}});
 
@@ -333,8 +338,6 @@ export async function openKeloStudioLive({root=globalThis}={}){
         try{
           const seed=phoneSeedAssets(allAssets());
           ensurePhonePlacementPrefabs(studio,seed);
-          // Do not reset the preview queue on first paint — keep immediate glyphs.
-          if(why==='refresh')phonePreview?.reset?.();
           shell.setAssets(seed);
           const first=seed[0];
           if(first?.id){
@@ -344,9 +347,6 @@ export async function openKeloStudioLive({root=globalThis}={}){
             try{shell.openAssets?.();}catch{}
           }
           updateShell();
-          for(const asset of seed.slice(0,8)){
-            try{studio.assetPreview.warmAsset(asset.id||asset).catch(()=>{});}catch{}
-          }
           try{shell?.setStatus?.(`${mode.toUpperCase()} · ${seed.length} assets · preview`);}catch{}
           return seed;
         }catch{return null;}
@@ -355,13 +355,10 @@ export async function openKeloStudioLive({root=globalThis}={}){
       const immediate=paintSeed('seed',{openSheet:true});
       (root.setTimeout||setTimeout)(()=>{
         if(!running)return;
-        paintSeed('reinforce',{openSheet:true});
+        const have=shell.root?.querySelectorAll?.('[data-asset]')?.length||0;
+        if(have>=4)return;
+        paintSeed('reinforce',{openSheet:have===0});
       },450);
-      (root.setTimeout||setTimeout)(()=>{
-        if(!running||shell.root.dataset.keloAssetsReady==='1')return;
-        const n=(allAssets()||[]).length;
-        if(n>4)paintSeed('refresh',{openSheet:true});
-      },2400);
       shell.root.addEventListener('click',e=>{
         if(e.target?.closest?.('[data-act="edit-assets"]'))loadFullAssets();
         const tab=e.target?.closest?.('[data-tab]');
@@ -425,7 +422,7 @@ export async function openKeloStudioLive({root=globalThis}={}){
     }
     onKey=e=>{if(isStudioUi(e))return;const key=e.key.toLowerCase();if(playing){if(key==='escape'){e.preventDefault();void guarded(togglePlaytest);}return;}if((e.metaKey||e.ctrlKey)&&key==='z'){e.preventDefault();void guarded(()=>e.shiftKey?studio.kernel.redo():studio.kernel.undo());return;}if((e.metaKey||e.ctrlKey)&&key==='d'){e.preventDefault();void guarded(()=>creator.duplicateSelection());return;}if((e.metaKey||e.ctrlKey)&&key==='c'){e.preventDefault();const count=creator.copySelection();productivity?.setClipboard(count);toast(root,count?`${count} objeto${count===1?'':'s'} copiado${count===1?'':'s'}`:'Selecciona algo para copiar');return;}if((e.metaKey||e.ctrlKey)&&key==='v'){e.preventDefault();void guarded(()=>creator.pasteClipboard());return;}if((e.metaKey||e.ctrlKey)&&key==='s'){e.preventDefault();void guarded(async()=>{await saveDraft();toast(root,'Studio guardado');});return;}if(key==='f'){e.preventDefault();focusSelection();return;}if(key==='+'||key==='='){e.preventDefault();cameraController.setZoom(cameraController.zoom*1.2);updateShell();return;}if(key==='-'){e.preventDefault();cameraController.setZoom(cameraController.zoom/1.2);updateShell();return;}if(key==='0'){e.preventDefault();cameraController.setZoom(1);updateShell();return;}if(key==='escape'){e.preventDefault();if(['camera','placement','prefab','terrain','path','collision'].includes(mode)){cancelTransient();setMode('select');}else void closeKeloStudioLive({root});return;}if(key==='r'){e.preventDefault();void guarded(()=>mode==='placement'?Promise.resolve(studio.tools.placement.rotate(90)):mode==='prefab'?Promise.resolve(null):creator.rotateSelection(90));return;}if(key==='e'&&(mode==='terrain'||mode==='path')){e.preventDefault();const next=!studio.tools.terrain.state().erase;studio.tools.terrain.configure({erase:next});shell?.setErase(next);updateShell();return;}if(key==='delete'||key==='backspace'){e.preventDefault();if(mode==='collision'&&studio.tools.collision.selectedId)void guarded(()=>studio.tools.collision.removeSelected());else void guarded(()=>creator.removeSelection());return;}if(key==='q')setMode('select');else if(key==='v')setMode('move');else if(key==='h')setMode(mode==='camera'?'select':'camera');else if(key==='g')setMode('terrain');else if(key==='p')setMode('path');else if(key==='c')setMode('collision');};root.document.addEventListener('keydown',onKey,true);
     const liveSession={version:'kelo-studio-creator-v1.8.0-world-bridge-a11',studio,prefabLibrary,cameraController,get draftId(){return draftId;},get mode(){return mode;},get playing(){return playing;},get snapSize(){return snapSize;},setMode,beginPlacement,focusSelection,validate:validateMap,togglePlaytest:()=>guarded(togglePlaytest),close:()=>closeKeloStudioLive({root})};
-    Object.defineProperty(liveSession,'__cleanup',{value:async()=>{running=false;cancelDirectGesture();if(pinchScale){try{await endPinchScale({cancelled:true});}catch{}}cancelPinchPreviewFrame();stopOverlayDraw();if(onKey)root.document.removeEventListener('keydown',onKey,true);selectionUnsub?.();detachPointer?.();cameraController?.destroy();studio.kernel.input.pop('studio-live');unregisterInput?.();mirror.uninstall();productivity?.destroy();shell?.destroy();overlay?.destroy();studio.tools.collision.setVisible(false);if(inputLockToken){root.KeloInputLocks.release(inputLockToken);inputLockToken=null;}try{await studio.checkpoint();}catch{}try{studio.close();}catch{}try{await root.KELO_WORLD_EDIT?.request?.('world:view:published',{actorId});}catch{}},enumerable:false});
+    Object.defineProperty(liveSession,'__cleanup',{value:async()=>{running=false;releaseWorldSim();cancelDirectGesture();if(pinchScale){try{await endPinchScale({cancelled:true});}catch{}}cancelPinchPreviewFrame();stopOverlayDraw();if(onKey)root.document.removeEventListener('keydown',onKey,true);selectionUnsub?.();detachPointer?.();cameraController?.destroy();studio.kernel.input.pop('studio-live');unregisterInput?.();mirror.uninstall();productivity?.destroy();shell?.destroy();overlay?.destroy();studio.tools.collision.setVisible(false);if(inputLockToken){root.KeloInputLocks.release(inputLockToken);inputLockToken=null;}try{await studio.checkpoint();}catch{}try{studio.close();}catch{}try{await root.KELO_WORLD_EDIT?.request?.('world:view:published',{actorId});}catch{}},enumerable:false});
     if(shell?.root?.dataset)delete shell.root.dataset.keloWorldLoading;
     try{
       shell?.root?.querySelectorAll?.('button,select,input')?.forEach?.(control=>{
@@ -442,7 +439,7 @@ export async function openKeloStudioLive({root=globalThis}={}){
       overlayStart=(root.setTimeout||setTimeout)(hydrateAfterChrome,400);
     }else overlayStart=(root.setTimeout||setTimeout)(hydrateAfterChrome,0);
     return active;
-  }catch(error){running=false;try{if(overlayStart){(root.clearTimeout||clearTimeout)(overlayStart);overlayStart=0;}}catch{}try{if(typeof root.cancelAnimationFrame==='function')root.cancelAnimationFrame(frame);}catch{}try{(root.clearTimeout||clearTimeout)(frame);}catch{}try{cancelDirectGesture();detachPointer?.();cameraController?.destroy();}catch{}try{studio.kernel.input.pop('studio-live');unregisterInput?.();}catch{}try{mirror.uninstall();}catch{}try{productivity?.destroy();shell?.destroy();overlay?.destroy();studio.tools.collision.setVisible(false);}catch{}if(inputLockToken){try{root.KeloInputLocks.release(inputLockToken);}catch{}inputLockToken=null;}try{studio.close();}catch{}throw error;}
+  }catch(error){running=false;try{releaseWorldSim();}catch{}try{if(overlayStart){(root.clearTimeout||clearTimeout)(overlayStart);overlayStart=0;}}catch{}try{if(typeof root.cancelAnimationFrame==='function')root.cancelAnimationFrame(frame);}catch{}try{(root.clearTimeout||clearTimeout)(frame);}catch{}try{cancelDirectGesture();detachPointer?.();cameraController?.destroy();}catch{}try{studio.kernel.input.pop('studio-live');unregisterInput?.();}catch{}try{mirror.uninstall();}catch{}try{productivity?.destroy();shell?.destroy();overlay?.destroy();studio.tools.collision.setVisible(false);}catch{}if(inputLockToken){try{root.KeloInputLocks.release(inputLockToken);}catch{}inputLockToken=null;}try{studio.close();}catch{}throw error;}
 }
 
 export async function closeKeloStudioLive({root=globalThis}={}){if(!active)return;const session=active;active=null;root.document?.body?.classList.remove('kelo-studio-active');await session.__cleanup?.();}
