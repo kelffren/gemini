@@ -117,7 +117,7 @@ export async function bootKeloCreators({root=globalThis,stateAdapter=null}={}){
     if(id==='sprite-ability')await ensureSpriteAbilityExtensions();
     const session=await workspaces.open(id,{root,projects,permission,dependencies,contentSession,contentRepository,contentService,runtimeContent,avatarRuntime,avatarQuick,openWorkspace,...context});
     if(['world','ability','sprite-ability','npc','animation','vfx','appearance','avatar'].includes(id)){
-      try{const picker=await import('./ui/universal-asset-picker.mjs?v=1');root.__KELO_CREATOR_ASSET_PICKER_DISPOSE__?.();root.__KELO_CREATOR_ASSET_PICKER_DISPOSE__=picker.installUniversalAssetPicker({root,workspace:id,session});}catch(error){console.warn('[Creators] Universal Asset Picker unavailable',error);}
+      try{const picker=await import('./ui/universal-asset-picker.mjs?v=2');root.__KELO_CREATOR_ASSET_PICKER_DISPOSE__?.();root.__KELO_CREATOR_ASSET_PICKER_DISPOSE__=picker.installUniversalAssetPicker({root,workspace:id,session});}catch(error){console.warn('[Creators] Universal Asset Picker unavailable',error);}
     }
     try{
       const dock=await installCreatorApprovalDock({root,workspace:id,session,context,repository:contentRepository,contentSession});

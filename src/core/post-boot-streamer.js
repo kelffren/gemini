@@ -12,7 +12,7 @@
     'src/core/feature-registry.js?v=world-open-stay-20260930',
     'src/core/asset-registry.js?v=2-feature-registry',
     'src/core/module-loader.js?v=world-open-stay-20260930',
-    'src/ui/asset-library-launcher.js?v=12-place-first',
+    'src/ui/asset-library-launcher.js?v=20261001-nofreeze',
     'src/core/settings-lazy-gate.js?v=3-update-intel',
     'src/core/hot-data-registry.js?v=1-transactional',
     'src/abilities/ability-balance-hot-owner.js?v=1',

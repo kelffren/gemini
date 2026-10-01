@@ -89,7 +89,7 @@ async function completeCurrentScene(){
  return pack;
 }
 function openPage(path){const opened=root.open(path,'_blank');if(!opened)root.location.href=path;try{root.KELO_LUXE?.closeMenu?.();}catch{}}
-const openSpriteOS=()=>openPage('sprite-os.html'),openLibrary=()=>{void captureAssetSceneProfile();openPage('asset-vault.html');},openPacks=()=>openPage('content-packs.html'),openCommunityCreator=()=>openPage('creator-publish.html');
+const openSpriteOS=()=>openPage('sprite-os.html'),openLibrary=()=>{void captureAssetSceneProfile();openPage('asset-vault.html?v=20261001-nofreeze');},openPacks=()=>openPage('content-packs.html'),openCommunityCreator=()=>openPage('creator-publish.html');
 function menuButton(id,label,copy,icon,onClick,aria){const b=document.createElement('button');b.id=id;b.type='button';b.className='lx-menu-item';b.setAttribute('aria-label',aria);b.innerHTML=`<span class="lx-menu-icon" aria-hidden="true">${icon}</span><span class="lx-menu-copy"><b>${label}</b><small>${copy}</small></span>`;b.addEventListener('click',onClick);return b;}
 function buildSpriteButton(){return menuButton(SPRITE_ID,'Sprite OS','Buscar · probar · usar en juego','🧍',openSpriteOS,'Abrir Sprite OS');}
 function buildButton(){const b=menuButton(ID,'Biblioteca','Poner en la plaza','🧰',openLibrary,'Abrir Biblioteca');refresh(b);return b;}

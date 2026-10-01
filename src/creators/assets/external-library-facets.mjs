@@ -4,7 +4,7 @@
  * keys: LIBRARY FACETS PACKS FOLDERS CATEGORIES KENNEY LPC OPENGAMEART QUATERNIUS METADATA MOBILE
  * purpose: expose real provider-backed folders/categories for in-app browsing without fetching asset binaries
  */
-import {loadProviderConfig,browseProvider} from './external-asset-providers.mjs?v=10';
+import {loadProviderConfig,browseProvider} from './external-asset-providers.mjs?v=12';
 
 const cache=new Map();
 const MAX_INDEXED_ROWS=1920;

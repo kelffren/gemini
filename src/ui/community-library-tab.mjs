@@ -4,7 +4,7 @@
  * keys: COMMUNITY CATALOG EQUIP UNEQUIP SLOT PREVIEW MOBILE LAZY
  * purpose: extend asset-vault.html with a community catalog while preserving its external-provider and personal-vault flows
  */
-import './external-library-browser-ui.mjs?v=6';
+import './external-library-browser-ui.mjs?v=7';
 import {
   listCommunityAssets,
   listEquippedCommunityAssets,
