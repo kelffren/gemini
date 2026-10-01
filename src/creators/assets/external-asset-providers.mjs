@@ -21,7 +21,7 @@ import {installUniversalSpritePreview} from './universal-sprite-preview.mjs?v=3'
 import {installUniversalAvatarTryOn} from './universal-avatar-tryon.mjs?v=1';
 import {installUniversalLookBuilder} from './universal-look-builder.mjs?v=1';
 import {rankAssets} from './asset-quality-ranker.mjs?v=1';
-import {installAssetIntelligenceLiveUI} from '../../ui/asset-intelligence-live-ui.mjs?v=1';
+import {installAssetIntelligenceLiveUI} from '../../ui/asset-intelligence-live-ui.mjs?v=2';
 import {beginAssetMetric,recordAssetMetric} from './live-asset-telemetry.mjs?v=1';
 
 const CONFIG_URL=new URL('../../../data/external-asset-providers.json?v=14',import.meta.url).href;

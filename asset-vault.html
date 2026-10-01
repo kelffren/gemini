@@ -16,7 +16,7 @@
 </div><aside class="palette-bar" id="palette-bar" hidden><div><b id="palette-count">0 EN PALETA</b><small id="palette-note">Selecciona assets de esta página</small></div><button class="btn" id="palette-clear" type="button">LIMPIAR</button><button class="btn go" id="palette-build" type="button">Pintar</button></aside><div class="toast" id="toast"></div>
 <div class="preview-modal" id="preview-modal" hidden><section class="preview-sheet" role="dialog" aria-modal="true" aria-labelledby="preview-name"><header class="preview-head"><div class="preview-title"><b id="preview-name">Vista previa</b><span id="preview-subtitle">Carga bajo demanda</span></div><button class="preview-close" data-preview-close aria-label="Cerrar">×</button></header><div class="preview-stage" id="preview-stage"><div class="preview-loading">Preparando vista previa…</div></div><div class="preview-actions" id="preview-actions"></div><div class="preview-info" id="preview-info"></div></section></div>
 <script type="module">
-import {searchExternalAssets,getProviderStatuses} from './src/creators/assets/external-asset-providers.mjs?v=11';
+import {searchExternalAssets,getProviderStatuses} from './src/creators/assets/external-asset-providers.mjs?v=12';
 import {downloadAsset,integrateContent,listAssets,getVaultStats,removeLocal,getObjectURL} from './src/creators/assets/personal-asset-vault.mjs?v=3';
 const PICKER=new URLSearchParams(location.search).get('picker')==='1',PICKER_CONTEXT=new URLSearchParams(location.search).get('context')||'generic',PICKER_KIND=new URLSearchParams(location.search).get('kind')||'all';
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c])),fmt=n=>n<1024?`${n} B`:n<1048576?`${(n/1024).toFixed(1)} KB`:`${(n/1048576).toFixed(n<10485760?1:0)} MB`;
@@ -113,5 +113,5 @@ $('back').onclick=()=>{if(state.tab==='explore'&&!state.home){showHome();return;
 $('runtime').onclick=()=>location.href='asset-library.html';
 (async()=>{try{if(PICKER){document.querySelector('.title h1').textContent='Elegir de Biblioteca';document.querySelector('.title p').textContent='Selecciona un asset para '+PICKER_CONTEXT;state.kind=PICKER_KIND;state.home=false;}loadTray();renderChips();await refreshVault();state.providers=await getProviderStatuses();renderKindFilters();const filters=[{id:'all',name:'Inicio',live:true,lazy:false},...state.providers.filter(p=>p.live&&PRACTICAL.has(p.id))];$('provider-filters').innerHTML=filters.map(p=>`<button class="filter ${p.id==='all'?'on':''}" data-provider="${esc(p.id)}">${esc(p.name)}</button>`).join('');renderSources();if(PICKER){renderKindFilters();showCatalog();await activateProvider('all',{quiet:true});}else showHome();}catch(error){console.error(error);state.loading=false;showCatalog();$('remote-count').textContent='Error de catálogo';$('explore-grid').innerHTML=`<div class="empty">No se pudo abrir la biblioteca.<br>${esc(error.message||error)}</div>`;}})();
 </script>
-<script type="module" src="./src/ui/community-library-tab.mjs?v=6"></script>
+<script type="module" src="./src/ui/community-library-tab.mjs?v=7"></script>
 </body></html>
