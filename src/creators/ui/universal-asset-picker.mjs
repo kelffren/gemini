@@ -24,6 +24,12 @@ export function installUniversalAssetPicker({root=globalThis,workspace='generic'
         await mod.startExternalAssetPreview({root,session,asset});
         return;
       }
+      if(workspace==='ability'&&session?.kernel){
+        const commands=await import('../ability/ability-commands.mjs');
+        const patch=asset.contentKind==='vfx'?{visuals:{fx:asset.id},visualProfileId:asset.id}:{icon:asset.previewUrl||asset.id};
+        await session.kernel.execute(commands.createPatchAbilityDefinitionCommand(patch));
+        session.autosave?.markDirty?.();
+      }
       root.dispatchEvent(new CustomEvent('kelo:creator-asset-picked',{detail:{workspace,asset,session}}));
       notify(root,asset.name+' seleccionado de Biblioteca');
     }catch(error){notify(root,String(error?.message||error).replaceAll('_',' '));}
