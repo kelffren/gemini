@@ -25,7 +25,7 @@ import { installStudioMobileActionFeedback } from '../studio/ui/studio-mobile-ac
 import { installStudioMobileAdaptiveToolbar } from '../studio/ui/studio-mobile-adaptive-toolbar.mjs?v=mobile-adaptive-toolbar-20260916-1';
 import { installStudioMobileCommandSearch } from '../studio/ui/studio-mobile-command-search.mjs?v=mobile-command-search-20260916-1';
 import { installStudioMobileRadialContext } from '../studio/ui/studio-mobile-radial-context.mjs?v=mobile-radial-context-20260916-1';
-import { registerWorldWorkspace } from './workspaces/world-workspace.mjs?v=world-open-stay-20260930';
+import { registerWorldWorkspace } from './workspaces/world-workspace.mjs?v=studio-thaw-20260930';
 import { registerMapForgeWorkspace } from './workspaces/map-forge-workspace.mjs?v=map-forge-mobile-ui-20260916-1';
 import { registerMountWorkspace } from './workspaces/mount-workspace.mjs';
 import { registerAppearanceWorkspace } from './workspaces/appearance-workspace.mjs';

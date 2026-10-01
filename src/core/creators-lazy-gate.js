@@ -18,7 +18,7 @@ const OPEN_CREATOR_ACCESS=true;
 // Use a new URL and evict only a stale launcher that still reports access=false.
 const LAUNCHER_SRC='src/ui/studio-launcher.js?v=world-open-stay-20260930';
 const ASSET_CATALOG_SRC='src/property/property-asset-catalog.js?v=creator-assets-20260915-1';
-const assetForgeModuleUrl=()=>new URL('src/creators/creator-entry.mjs?v=world-open-stay-20260930',root.document?.baseURI||root.location.href).href;
+const assetForgeModuleUrl=()=>new URL('src/creators/creator-entry.mjs?v=studio-thaw-20260930',root.document?.baseURI||root.location.href).href;
 let loading=null,catalogLoading=null,forgeLoading=null;
 const query=()=>{try{return new URLSearchParams(root.location.search);}catch(_){return new URLSearchParams();}};
 const directRequested=()=>query().get('creators')==='1'||query().get('creator')==='1'||query().get('mapEditor')==='1';
