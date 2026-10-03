@@ -15,7 +15,7 @@ import { createRuntimeContentRegistry } from './content/runtime-content-registry
 import { createSupabaseCreatorContentRepository } from './content/supabase-content-repository.mjs';
 import { createUniversalContentService } from './content/universal-content-service.mjs';
 import { createAvatarQuickImportService } from './avatar/avatar-quick-import-service.mjs';
-import { installCreatorApprovalDock } from './approval/creator-approval-dock.mjs?v=world-open-stay-20260930';
+import { installCreatorApprovalDock } from './approval/creator-approval-dock.mjs?v=world-approval-layout-20261003';
 import { installCreatorAvatarRuntime } from '../characters/creator-avatar-runtime.mjs';
 import { createKeloSupabaseBrowserSession } from '../online/kelo-supabase-browser-session.mjs';
 import { KELO_SUPABASE_PUBLIC_CONFIG } from '../online/kelo-supabase-public-config.mjs';

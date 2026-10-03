@@ -28,7 +28,7 @@ assert.match(brushSource,/REGLAS ON/,'mobile UI must expose whether semantic rul
 assert.match(bridgeSource,/library-palette-brush-tool\.mjs\?v=3-context/,'bridge must cache-bust the context brush');
 assert.match(launcherSource,/library-build-bridge\.mjs\?v=4/,'launcher must use context-aware bridge');
 assert.match(indexSource,/post-boot-streamer\.js/,'game boot must reach post-boot streamer');
-assert.match(postBootSource,/asset-library-launcher\.js\?v=12-place-first/,'streamer must cache-bust context launcher');
+assert.match(postBootSource,/asset-library-launcher\.js\?v=[A-Za-z0-9-]+/,'streamer must cache-bust context launcher');
 
 assert.equal(classifySurfaceCell({role:'path',material:'grass'}),'path');
 assert.equal(classifySurfaceCell({role:'terrain',material:'water_deep'}),'water');

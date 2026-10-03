@@ -1,0 +1,130 @@
+{
+  "schema_version": 2,
+  "id": "BUG-0006",
+  "title": "World Approval button overlaps Library footer on mobile",
+  "status": "FIXED_PENDING_VERIFY",
+  "severity": "medium",
+  "area": [
+    "studio",
+    "creators",
+    "mobile",
+    "ui"
+  ],
+  "source": "player",
+  "discovered_at": "2026-10-03",
+  "reported_by": [
+    "player"
+  ],
+  "reports": [],
+  "environment": {
+    "game_build": "main@f4a10f39dbee705afdb33a1bcff97f60fc2a1007",
+    "device": "iPhone",
+    "os": "iOS",
+    "browser": "Safari",
+    "surface": "World editor asset palette"
+  },
+  "reproduction": [
+    "Open Create \u2192 World on iPhone.",
+    "Open Assets palette.",
+    "Compare Aprobaci\u00f3n with BIBLIOTECA COMPLETA, then expand approval."
+  ],
+  "expected": "Approval and Library have separate visible and clickable regions.",
+  "actual": "Lower fixed approval offsets overlap the palette footer; expanded approval also covers lower controls.",
+  "evidence": [
+    "Player IMG_8895.jpeg report; local attachment unavailable.",
+    "Collapsed approval bottom 70px while asset palette bottom 78px."
+  ],
+  "suspected_files": [
+    "src/creators/approval/creator-approval-dock.mjs"
+  ],
+  "owner_hint": "CreatorApprovalDock",
+  "claimed_by": null,
+  "claim_started_at": null,
+  "research": {
+    "status": "sufficient",
+    "summary": "Fixed lower offsets conflict with variable-height lower Studio panels.",
+    "known_facts": [
+      {
+        "id": "F1",
+        "statement": "Both approval and library use the same lower fixed region.",
+        "evidence": [
+          "creator-approval-dock.mjs CSS",
+          "studio-asset-palette.mjs CSS"
+        ]
+      }
+    ],
+    "hypotheses": [],
+    "ruled_out": [],
+    "unknowns": [],
+    "external_references": [
+      {
+        "title": "WebKit iPhone safe areas",
+        "url": "https://webkit.org/blog/7929/designing-websites-for-iphone-x/",
+        "lesson": "Safe insets protect screen edges, not sibling overlay collisions."
+      }
+    ],
+    "last_researched_at": "2026-10-03T02:00:00Z"
+  },
+  "attempt_history": [
+    {
+      "id": "A1",
+      "at": "2026-10-03T02:00:00Z",
+      "actor": "Codex",
+      "goal": "Separate approval and library hit regions",
+      "hypothesis_ids": [],
+      "change": {
+        "status": "candidate",
+        "commits": [],
+        "files": [
+          "src/creators/approval/creator-approval-dock.mjs",
+          "src/creators/creator-entry.mjs"
+        ],
+        "summary": "World approval occupies its own upper toolbar row; lower panels reserve the measured toolbar height."
+      },
+      "validation": {
+        "environment": "local Playwright iPhone",
+        "method": "world-approval-library-layout.spec.js and main-stability-mobile.spec.js",
+        "result": "PARTIAL",
+        "evidence": [
+          "Playwright layout regression passed locally with real UI modules bundled into an offline harness: 390\u00d7844, 430\u00d7932, 844\u00d7390; collapsed/expanded and Library hit-testing.",
+          "Full-game local navigation blocked by environment socket restrictions; exact build CI remains required."
+        ]
+      },
+      "conclusion": "Separate hit regions pass the local UI harness; full-game and LIVE phone validation pending."
+    }
+  ],
+  "next_best_actions": [
+    {
+      "priority": 1,
+      "action": "Run regression and inspect LIVE iPhone portrait/landscape.",
+      "reason": "Visual defect requires exact hit-region verification.",
+      "expected_signal": "Approval and Library remain clickable without overlap.",
+      "stop_condition": "Any overlap or hidden library footer."
+    }
+  ],
+  "fix": {
+    "status": "candidate",
+    "commits": [],
+    "files": [
+      "src/creators/approval/creator-approval-dock.mjs",
+      "src/creators/creator-entry.mjs"
+    ],
+    "summary": "World approval occupies its own upper toolbar row; lower panels reserve the measured toolbar height."
+  },
+  "verification": {
+    "status": "PENDING",
+    "method": "Local layout harness plus exact PR build main-stability-gate; physical iPhone LIVE remains pending.",
+    "evidence": [],
+    "verified_by": null,
+    "verified_at": null
+  },
+  "blocked_by": [],
+  "duplicate_of": null,
+  "related_bugs": [],
+  "notes": [],
+  "updated_at": "2026-10-03T02:00:00Z",
+  "regression": {
+    "test": "tests/world-approval-library-layout.spec.js",
+    "command": "npx playwright test tests/world-approval-library-layout.spec.js"
+  }
+}

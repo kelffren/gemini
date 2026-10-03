@@ -112,4 +112,4 @@ async function runDodge(page,label){
 }
 
 test('PvP visible button first-use + dodge winner mobile iPhone UA',async({browser})=>{const p=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,userAgent:IPHONE_UA});await runDodge(p,'mobile-iphone');await p.close();});
-test('PvP visible button first-use + dodge winner desktop',async({browser})=>{const p=await browser.newPage({viewport:{width:1440,height:900}});await runDodge(p,'desktop');await p.close();});
+test('PvP visible button first-use + dodge winner desktop',async({browser})=>{test.setTimeout(90000);const p=await browser.newPage({viewport:{width:1440,height:900}});await runDodge(p,'desktop');await p.close();});

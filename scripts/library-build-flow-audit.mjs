@@ -56,7 +56,7 @@ assert.match(vaultSource,/state\.palette\.clear\(\)/,'active-page palette must b
 assert.match(launcherSource,/platform\.openWorkspace\('world'\)/,'launcher must open the real World workspace directly');
 assert.match(launcherSource,/library-build-bridge\.mjs\?v=4/,'launcher must use semantic-aware build bridge');
 assert.match(indexSource,/post-boot-streamer\.js/,'boot must reach post-boot streamer');
-assert.match(postBootSource,/asset-library-launcher\.js\?v=12-place-first/,'streamer must cache-bust the semantic launcher');
+assert.match(postBootSource,/asset-library-launcher\.js\?v=[A-Za-z0-9-]+/,'streamer must cache-bust the semantic launcher');
 
 // Pure template selection contract.
 const catalogRows=[

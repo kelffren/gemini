@@ -4,9 +4,9 @@
  * owns: in-editor submit/status UX for ApprovalRequest
  * does-not-own: publication authority, admin review decisions or service-role credentials
  * security: authenticated RPC only; one pending request per logical workspace entity
- * mobile: World starts collapsed so the approval controls do not cover Asset Library cards or the map
+ * mobile: World uses an upper toolbar row; lower asset panels reserve its measured height
  */
-const VERSION='creator-approval-dock-v1.0.1';
+const VERSION='creator-approval-dock-v1.0.2';
 const STATUS=Object.freeze({
   draft:{label:'BORRADOR',action:'ENVIAR A APROBACIÓN'},
   pending:{label:'PENDIENTE',action:'PENDIENTE'},
@@ -53,7 +53,19 @@ function resolveTarget({root,workspace,session,context}){
   return {workspace,entityId,title,summary,requestType:custom.requestType||TYPE_BY_WORKSPACE[workspace]||'other',metadata};
 }
 function css(){return `
-.kcad{position:fixed;right:max(10px,env(safe-area-inset-right));bottom:max(10px,env(safe-area-inset-bottom));z-index:2147483540;display:grid;gap:6px;min-width:min(310px,calc(100vw - 20px));max-width:360px;padding:9px;border:1px solid rgba(219,183,88,.34);border-radius:15px;background:rgba(7,12,18,.96);box-shadow:0 16px 50px rgba(0,0,0,.48);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eef4ff}.kcad-row{display:flex;align-items:center;gap:8px}.kcad-copy{min-width:0;flex:1}.kcad-copy b{display:block;font-size:10px;letter-spacing:.07em}.kcad-copy small{display:block;margin-top:2px;color:#8093a6;font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kcad-state{border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:4px 7px;font-size:8px;font-weight:950}.kcad-state.pending{color:#ffd28d;background:#382714}.kcad-state.approved{color:#9de0bd;background:#10291e}.kcad-state.rejected{color:#ffabab;background:#36161a}.kcad-actions{display:flex;gap:6px}.kcad button{min-height:36px;border:1px solid rgba(219,183,88,.28);border-radius:10px;background:#142032;color:#eef4ff;font-size:9px;font-weight:900;padding:8px 10px}.kcad button.primary{flex:1;background:linear-gradient(135deg,#d5b35f,#9a752d);color:#11100b}.kcad button:disabled{opacity:.5}.kcad-note{font-size:8px;line-height:1.35;color:#9aacbd;max-height:34px;overflow:auto}.kcad-toggle{display:none}@media(max-width:480px){.kcad{left:8px;right:8px;min-width:0;max-width:none}.kcad[data-workspace="world"] .kcad-toggle{display:block}.kcad[data-workspace="world"].collapsed{left:auto;right:8px;bottom:max(70px,calc(env(safe-area-inset-bottom) + 60px));min-width:0;max-width:150px;padding:4px}.kcad[data-workspace="world"].collapsed .kcad-row,.kcad[data-workspace="world"].collapsed .kcad-actions,.kcad[data-workspace="world"].collapsed .kcad-note{display:none}}
+.kcad{position:fixed;right:max(10px,env(safe-area-inset-right));bottom:max(10px,env(safe-area-inset-bottom));z-index:2147483540;display:grid;gap:6px;min-width:min(310px,calc(100vw - 20px));max-width:360px;padding:9px;border:1px solid rgba(219,183,88,.34);border-radius:15px;background:rgba(7,12,18,.96);box-shadow:0 16px 50px rgba(0,0,0,.48);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eef4ff}.kcad-row{display:flex;align-items:center;gap:8px}.kcad-copy{min-width:0;flex:1}.kcad-copy b{display:block;font-size:10px;letter-spacing:.07em}.kcad-copy small{display:block;margin-top:2px;color:#8093a6;font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kcad-state{border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:4px 7px;font-size:8px;font-weight:950}.kcad-state.pending{color:#ffd28d;background:#382714}.kcad-state.approved{color:#9de0bd;background:#10291e}.kcad-state.rejected{color:#ffabab;background:#36161a}.kcad-actions{display:flex;gap:6px}.kcad button{min-height:36px;border:1px solid rgba(219,183,88,.28);border-radius:10px;background:#142032;color:#eef4ff;font-size:9px;font-weight:900;padding:8px 10px}.kcad button.primary{flex:1;background:linear-gradient(135deg,#d5b35f,#9a752d);color:#11100b}.kcad button:disabled{opacity:.5}.kcad-note{font-size:8px;line-height:1.35;color:#9aacbd;max-height:34px;overflow:auto}.kcad-toggle{display:none}@media(max-width:480px){.kcad{left:8px;right:8px;min-width:0;max-width:none}}
+@media(max-width:760px),(max-height:480px){
+  .ks-top.kcad-host{flex-wrap:wrap}
+  .kcad-slot{flex:0 0 100%;display:flex;justify-content:flex-end;min-width:0}
+  .kcad[data-workspace="world"]{position:static;min-width:0;width:min(360px,100%);max-width:100%;box-sizing:border-box;max-height:30vh;overflow:auto}
+  .kcad[data-workspace="world"] .kcad-toggle{display:block;min-height:44px}
+  .kcad[data-workspace="world"].collapsed{width:auto;max-width:150px;padding:4px}
+  .kcad[data-workspace="world"].collapsed .kcad-row,.kcad[data-workspace="world"].collapsed .kcad-actions,.kcad[data-workspace="world"].collapsed .kcad-note{display:none}
+  #kelo-studio-live.kcad-reserved .ks-asset-palette{max-height:min(58vh,480px,calc(100vh - var(--kcad-header-bottom,140px) - max(78px,calc(env(safe-area-inset-bottom) + 70px)) - 8px))!important;overflow:auto}
+  #kelo-studio-live.kcad-reserved .ks-bottom{max-height:min(43vh,360px,calc(100vh - var(--kcad-header-bottom,140px) - max(8px,env(safe-area-inset-bottom)) - 8px))!important}
+}
+@media(max-height:480px){#kelo-studio-live.kcad-reserved .ks-asset-palette.on{display:block}.kcad[data-workspace="world"]{max-height:24vh}}
+
 `;}
 
 export async function installCreatorApprovalDock({root=globalThis,workspace,session,context={},repository,contentSession}={}){
@@ -63,9 +75,16 @@ export async function installCreatorApprovalDock({root=globalThis,workspace,sess
   if(!root.document.getElementById('kelo-creator-approval-dock-style')){const style=root.document.createElement('style');style.id='kelo-creator-approval-dock-style';style.textContent=css();root.document.head.append(style);}
   const dock=root.document.createElement('aside');dock.className='kcad';dock.dataset.workspace=workspace;dock.innerHTML='<button class="kcad-toggle" type="button" aria-expanded="false" aria-label="Mostrar aprobación">Aprobación</button><div class="kcad-row"><div class="kcad-copy"><b>APPROVALREQUEST</b><small></small></div><span class="kcad-state draft">BORRADOR</span></div><div class="kcad-actions"><button class="primary">ENVIAR A APROBACIÓN</button><button class="refresh" aria-label="Actualizar estado">↻</button></div><div class="kcad-note"></div>';
   if(workspace==='world')dock.classList.add('collapsed');
-  root.document.body.append(dock);
+  // KELO-INDEX UI MOBILE APPROVAL: reserve a toolbar row instead of competing with the lower library.
+  const toolbar=workspace==='world'?shell.querySelector('.ks-top'):null;
+  const slot=toolbar?root.document.createElement('div'):null;
+  if(slot){slot.className='kcad-slot';toolbar.classList.add('kcad-host');slot.append(dock);toolbar.append(slot);shell.classList.add('kcad-reserved');}
+  else root.document.body.append(dock);
+  const reserveHeader=()=>{if(toolbar?.isConnected)shell.style.setProperty('--kcad-header-bottom',`${Math.ceil(toolbar.getBoundingClientRect().bottom)}px`);};
+  const layoutObserver=toolbar&&root.ResizeObserver?new root.ResizeObserver(reserveHeader):null;
+  layoutObserver?.observe(toolbar);root.addEventListener?.('resize',reserveHeader);reserveHeader();
   const toggle=dock.querySelector('.kcad-toggle');
-  toggle.onclick=()=>{const collapsed=dock.classList.toggle('collapsed');toggle.setAttribute('aria-expanded',String(!collapsed));toggle.setAttribute('aria-label',collapsed?'Mostrar aprobación':'Ocultar aprobación');};
+  toggle.onclick=()=>{const collapsed=dock.classList.toggle('collapsed');toggle.setAttribute('aria-expanded',String(!collapsed));toggle.setAttribute('aria-label',collapsed?'Mostrar aprobación':'Ocultar aprobación');reserveHeader();};
   const subtitle=dock.querySelector('.kcad-copy small'),state=dock.querySelector('.kcad-state'),submit=dock.querySelector('button.primary'),refresh=dock.querySelector('button.refresh'),note=dock.querySelector('.kcad-note');
   let busy=false,current={status:'draft',request_id:null},target=null,destroyed=false;
   const toast=message=>typeof root.showToast==='function'?root.showToast(message):console.info('[CreatorApproval]',message);
@@ -97,7 +116,7 @@ export async function installCreatorApprovalDock({root=globalThis,workspace,sess
   submit.onclick=()=>void send().catch(()=>{});refresh.onclick=()=>void load();
   const onFocus=()=>void load();const onVisible=()=>{if(root.document.visibilityState==='visible')void load();};root.addEventListener?.('focus',onFocus);root.document.addEventListener('visibilitychange',onVisible);
   const Observer=root.MutationObserver;const observer=Observer?new Observer(()=>{if(!shell.isConnected)destroy();}):null;observer?.observe(root.document.body,{childList:true,subtree:true});
-  function destroy(){if(destroyed)return;destroyed=true;observer?.disconnect();root.removeEventListener?.('focus',onFocus);root.document.removeEventListener('visibilitychange',onVisible);dock.remove();}
+  function destroy(){if(destroyed)return;destroyed=true;observer?.disconnect();layoutObserver?.disconnect();root.removeEventListener?.('resize',reserveHeader);slot?.remove();toolbar?.classList.remove('kcad-host');shell.classList.remove('kcad-reserved');shell.style.removeProperty('--kcad-header-bottom');root.removeEventListener?.('focus',onFocus);root.document.removeEventListener('visibilitychange',onVisible);dock.remove();}
   await load();
   return Object.freeze({version:VERSION,dock,refresh:load,submit:send,destroy,get target(){return target;},get status(){return current?.status||'draft';}});
 }

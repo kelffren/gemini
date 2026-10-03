@@ -143,6 +143,7 @@ jobs:
         run: >-
           npx playwright test
           tests/main-stability-mobile.spec.js
+          tests/world-approval-library-layout.spec.js
           tests/world-editor-ios-reopen.spec.js
           tests/universal-sprite-original-game.spec.js
           tests/sprite-os.spec.js
