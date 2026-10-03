@@ -420,9 +420,41 @@ export async function openKeloStudioLive({root=globalThis}={}){
         try{shell?.setStatus?.(phoneOverlay?`${mode.toUpperCase()} · listo · coloca assets`:'Editor listo');}catch{}
       }
     }
+    const BUILD_HANDOFF_KEY='kelo.library.build.pending.v1',PALETTE_HANDOFF_KEY='kelo.library.palette.pending.v1';
+    const consumeExternalBuild=async(id)=>{
+      id=String(id||'').trim();if(!id)return false;
+      const bridge=await import('./library-build-bridge.mjs?v=external-studio-handoff-1');
+      const result=await bridge.startPersonalAssetPlacement({root,session:liveSession,assetId:id});
+      try{shell?.closeAssets?.();}catch{}
+      try{studio.assetPalette?.close?.();}catch{}
+      toast(root,'Asset externo listo · toca el mapa para colocarlo');
+      updateShell();return result;
+    };
+    const consumeExternalPalette=async(ids)=>{
+      const list=[...new Set((Array.isArray(ids)?ids:[]).map(String).filter(Boolean))];if(list.length<2)return false;
+      const bridge=await import('./library-build-bridge.mjs?v=external-studio-handoff-1');
+      const result=await bridge.startPersonalAssetPalette({root,session:liveSession,assetIds:list});
+      try{shell?.closeAssets?.();}catch{}
+      toast(root,`Paleta externa lista · ${list.length} assets`);
+      updateShell();return result;
+    };
+    const onExternalBuild=event=>void guarded(()=>consumeExternalBuild(event?.detail?.id||event?.detail?.assetId||event?.detail));
+    const onExternalPalette=event=>void guarded(()=>consumeExternalPalette(event?.detail?.ids||event?.detail?.assetIds||[]));
+    root.addEventListener?.('kelo:build-personal-content',onExternalBuild);
+    root.addEventListener?.('kelo:build-personal-palette',onExternalPalette);
+    (root.setTimeout||setTimeout)(()=>{
+      try{
+        const pending=JSON.parse(root.localStorage?.getItem?.(BUILD_HANDOFF_KEY)||'null');
+        if(pending?.id&&Date.now()-Number(pending.at||0)<10*60*1000){root.localStorage.removeItem(BUILD_HANDOFF_KEY);void guarded(()=>consumeExternalBuild(pending.id));}
+      }catch{}
+      try{
+        const pending=JSON.parse(root.localStorage?.getItem?.(PALETTE_HANDOFF_KEY)||'null');
+        if(Array.isArray(pending?.ids)&&Date.now()-Number(pending.at||0)<10*60*1000){root.localStorage.removeItem(PALETTE_HANDOFF_KEY);void guarded(()=>consumeExternalPalette(pending.ids));}
+      }catch{}
+    },0);
     onKey=e=>{if(isStudioUi(e))return;const key=e.key.toLowerCase();if(playing){if(key==='escape'){e.preventDefault();void guarded(togglePlaytest);}return;}if((e.metaKey||e.ctrlKey)&&key==='z'){e.preventDefault();void guarded(()=>e.shiftKey?studio.kernel.redo():studio.kernel.undo());return;}if((e.metaKey||e.ctrlKey)&&key==='d'){e.preventDefault();void guarded(()=>creator.duplicateSelection());return;}if((e.metaKey||e.ctrlKey)&&key==='c'){e.preventDefault();const count=creator.copySelection();productivity?.setClipboard(count);toast(root,count?`${count} objeto${count===1?'':'s'} copiado${count===1?'':'s'}`:'Selecciona algo para copiar');return;}if((e.metaKey||e.ctrlKey)&&key==='v'){e.preventDefault();void guarded(()=>creator.pasteClipboard());return;}if((e.metaKey||e.ctrlKey)&&key==='s'){e.preventDefault();void guarded(async()=>{await saveDraft();toast(root,'Studio guardado');});return;}if(key==='f'){e.preventDefault();focusSelection();return;}if(key==='+'||key==='='){e.preventDefault();cameraController.setZoom(cameraController.zoom*1.2);updateShell();return;}if(key==='-'){e.preventDefault();cameraController.setZoom(cameraController.zoom/1.2);updateShell();return;}if(key==='0'){e.preventDefault();cameraController.setZoom(1);updateShell();return;}if(key==='escape'){e.preventDefault();if(['camera','placement','prefab','terrain','path','collision'].includes(mode)){cancelTransient();setMode('select');}else void closeKeloStudioLive({root});return;}if(key==='r'){e.preventDefault();void guarded(()=>mode==='placement'?Promise.resolve(studio.tools.placement.rotate(90)):mode==='prefab'?Promise.resolve(null):creator.rotateSelection(90));return;}if(key==='e'&&(mode==='terrain'||mode==='path')){e.preventDefault();const next=!studio.tools.terrain.state().erase;studio.tools.terrain.configure({erase:next});shell?.setErase(next);updateShell();return;}if(key==='delete'||key==='backspace'){e.preventDefault();if(mode==='collision'&&studio.tools.collision.selectedId)void guarded(()=>studio.tools.collision.removeSelected());else void guarded(()=>creator.removeSelection());return;}if(key==='q')setMode('select');else if(key==='v')setMode('move');else if(key==='h')setMode(mode==='camera'?'select':'camera');else if(key==='g')setMode('terrain');else if(key==='p')setMode('path');else if(key==='c')setMode('collision');};root.document.addEventListener('keydown',onKey,true);
-    const liveSession={version:'kelo-studio-creator-v1.8.0-world-bridge-a11',studio,prefabLibrary,cameraController,get draftId(){return draftId;},get mode(){return mode;},get playing(){return playing;},get snapSize(){return snapSize;},setMode,beginPlacement,focusSelection,validate:validateMap,togglePlaytest:()=>guarded(togglePlaytest),close:()=>closeKeloStudioLive({root})};
-    Object.defineProperty(liveSession,'__cleanup',{value:async()=>{running=false;releaseWorldSim();cancelDirectGesture();if(pinchScale){try{await endPinchScale({cancelled:true});}catch{}}cancelPinchPreviewFrame();stopOverlayDraw();if(onKey)root.document.removeEventListener('keydown',onKey,true);selectionUnsub?.();detachPointer?.();cameraController?.destroy();studio.kernel.input.pop('studio-live');unregisterInput?.();mirror.uninstall();productivity?.destroy();shell?.destroy();overlay?.destroy();studio.tools.collision.setVisible(false);if(inputLockToken){root.KeloInputLocks.release(inputLockToken);inputLockToken=null;}try{await studio.checkpoint();}catch{}try{studio.close();}catch{}try{await root.KELO_WORLD_EDIT?.request?.('world:view:published',{actorId});}catch{}},enumerable:false});
+    const liveSession={version:'kelo-studio-creator-v1.8.1-external-library-bridge',studio,prefabLibrary,cameraController,get draftId(){return draftId;},get mode(){return mode;},get playing(){return playing;},get snapSize(){return snapSize;},setMode,beginPlacement,focusSelection,validate:validateMap,togglePlaytest:()=>guarded(togglePlaytest),close:()=>closeKeloStudioLive({root})};
+    Object.defineProperty(liveSession,'__cleanup',{value:async()=>{running=false;releaseWorldSim();cancelDirectGesture();if(pinchScale){try{await endPinchScale({cancelled:true});}catch{}}cancelPinchPreviewFrame();stopOverlayDraw();if(onKey)root.document.removeEventListener('keydown',onKey,true);root.removeEventListener?.('kelo:build-personal-content',onExternalBuild);root.removeEventListener?.('kelo:build-personal-palette',onExternalPalette);selectionUnsub?.();detachPointer?.();cameraController?.destroy();studio.kernel.input.pop('studio-live');unregisterInput?.();mirror.uninstall();productivity?.destroy();shell?.destroy();overlay?.destroy();studio.tools.collision.setVisible(false);if(inputLockToken){root.KeloInputLocks.release(inputLockToken);inputLockToken=null;}try{await studio.checkpoint();}catch{}try{studio.close();}catch{}try{await root.KELO_WORLD_EDIT?.request?.('world:view:published',{actorId});}catch{}},enumerable:false});
     if(shell?.root?.dataset)delete shell.root.dataset.keloWorldLoading;
     try{
       shell?.root?.querySelectorAll?.('button,select,input')?.forEach?.(control=>{
