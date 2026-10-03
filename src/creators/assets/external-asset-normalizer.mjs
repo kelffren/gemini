@@ -7,7 +7,7 @@ const F=Object.freeze;
 const n=(v,d=0)=>Number.isFinite(Number(v))?Number(v):d;
 function hints(asset){return [asset?.name,asset?.category,asset?.contentKind,...(asset?.tags||[])].filter(Boolean).join(' ').toLowerCase();}
 export function inferExternalSpriteProfile(asset={},imageInfo={}){
- const text=hints(asset),w=Math.max(1,n(imageInfo.width||asset.width,32)),h=Math.max(1,n(imageInfo.height||asset.height,32));
+ if(asset?.spriteProfile){const p=asset.spriteProfile;return F({kind:'sprite-sheet',frameWidth:n(p.frameWidth,32),frameHeight:n(p.frameHeight,32),columns:n(p.columns,1),rows:n(p.rows,1),frameCount:n(p.columns,1)*n(p.rows,1),anchor:F({x:.5,y:1}),background:'auto-corners',transparent:true,pixelArt:true});}\n const text=hints(asset),w=Math.max(1,n(imageInfo.width||asset.width,32)),h=Math.max(1,n(imageInfo.height||asset.height,32));
  const tagged=text.match(/\b(8|16|24|32|48|64|96|128)x\1\b/),cell=tagged?Number(tagged[1]):0;
  let frameWidth=cell||Math.min(w,h),frameHeight=cell||Math.min(w,h),columns=Math.max(1,Math.floor(w/frameWidth)),rows=Math.max(1,Math.floor(h/frameHeight));
  if(/sprite\s*sheet|spritesheet|animation|animated|walk|run/.test(text)&&columns===1&&w>h){frameWidth=h;columns=Math.max(1,Math.floor(w/frameWidth));}
