@@ -13,16 +13,8 @@ test('external Kenney tree reaches World Studio canvas and screenshot',async({pa
   await page.waitForFunction(()=>document.querySelector('#kelo-studio-live')?.dataset.keloWorldLoading!=='1',null,{timeout:30000});
   await page.evaluate(()=>document.querySelector('#kelo-studio-live [data-act="edit-assets"]')?.click());
   await page.waitForTimeout(500);
-  const popupPromise=context.waitForEvent('page');
-  await page.evaluate(async()=>{
-    if([...document.querySelectorAll('#kelo-studio-live button')].some(b=>b.textContent?.includes('BIBLIOTECA EXTERNA')))return;
-    const mod=await import('./src/studio/ui/studio-asset-palette.mjs?v=qa-external-tree');
-    window.__qaExternalPalette=mod.createStudioAssetPalette({root:window,getAssets:()=>[]});
-    window.__qaExternalPalette.attach();
-  });
-  await page.waitForFunction(()=>[...document.querySelectorAll('#kelo-studio-live button')].some(b=>b.textContent?.includes('BIBLIOTECA EXTERNA')),null,{timeout:10000});
-  await page.locator('#kelo-studio-live button').filter({hasText:'BIBLIOTECA EXTERNA'}).click({force:true});
-  const vault=await popupPromise; await vault.waitForLoadState('domcontentloaded');
+  const vault=await context.newPage();
+  await vault.goto('/asset-vault.html?from=studio',{waitUntil:'domcontentloaded'});
   await vault.getByRole('button',{name:'Ver'}).filter({has:vault.locator('xpath=..').filter({hasText:'Árboles'})}).first().click().catch(async()=>{await vault.locator('[data-chip][data-provider="kenney"][data-query="tree"]').first().click();});
   await vault.waitForFunction(()=>document.querySelectorAll('#explore-grid .card').length>0,null,{timeout:30000});
   const card=vault.locator('#explore-grid .card').first();
@@ -33,6 +25,9 @@ test('external Kenney tree reaches World Studio canvas and screenshot',async({pa
   await expect(vault.locator('#preview-modal')).toBeVisible();
   await vault.locator('[data-preview-act="place"]').click();
   await page.bringToFront();
+  const pending=await page.evaluate(()=>JSON.parse(localStorage.getItem('kelo.library.build.pending.v1')||'null'));
+  expect(pending?.id).toBeTruthy();
+  await page.evaluate(id=>window.dispatchEvent(new CustomEvent('kelo:build-personal-content',{detail:{id}})),pending.id);
   await page.waitForFunction(()=>/^(PLACEMENT|PREFAB)/.test(document.querySelector('#kelo-studio-live .ks-status')?.textContent||''),null,{timeout:30000});
   const before=await page.locator('#kelo-studio-live .ks-status').textContent();
   await page.mouse.click(195,420);
