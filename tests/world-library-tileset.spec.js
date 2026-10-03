@@ -35,6 +35,8 @@ test('World uses a chosen Library tile and retains it after save and reopen',asy
   const picker=page.locator('#kelo-tileset-picker');await expect(picker).toBeVisible();
   expect(await page.evaluate(()=>window.__tilesetQA.studio.tools.placement.getPreview())).toBeNull();
   await expect(picker).toHaveCSS('pointer-events','auto');
+  console.log('TILESET_QA_LAYOUT',await picker.evaluate(e=>({panel:e.getBoundingClientRect().toJSON(),button:e.querySelector('[data-tileset-prepare]').getBoundingClientRect().toJSON(),height:innerHeight,header:document.querySelector('#kelo-studio-live .ks-top')?.getBoundingClientRect().toJSON()})));
+  await expect(picker.locator('[data-tileset-prepare]')).toBeInViewport();
   await picker.locator('[data-tileset-prepare]').click({timeout:10000});
   await expect(picker.locator('[data-tile-template]')).toHaveCount(8,{timeout:15000});
   console.log('TILESET_QA_CELLS_READY');

@@ -23,7 +23,17 @@ export async function startTilesetLibraryPlacement({root=globalThis,session,asse
   panel.innerHTML='<div style="display:flex;gap:8px;align-items:center"><b style="flex:1">Elegir tile</b><button type="button" data-tileset-toggle>Cambiar tile</button><button type="button" data-tileset-close aria-label="Cerrar tileset">×</button></div><div data-tileset-body><p data-tileset-name></p><div style="display:flex;gap:6px;flex-wrap:wrap"><label>Ancho <input data-grid="tileWidth" type="number" min="1" max="512" style="width:58px"></label><label>Alto <input data-grid="tileHeight" type="number" min="1" max="512" style="width:58px"></label><label>Margen <input data-grid="margin" type="number" min="0" max="128" style="width:48px"></label><label>Separación <input data-grid="spacing" type="number" min="0" max="128" style="width:48px"></label></div><button type="button" data-tileset-prepare>Usar tileset</button><p data-tileset-status role="status">Define el tamaño en píxeles y elige una pieza para colocarla en el mapa.</p><div data-tileset-tiles style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px"></div><div style="display:flex;gap:8px;align-items:center;margin-top:8px"><button type="button" data-tileset-prev>Anterior</button><span data-tileset-page></span><button type="button" data-tileset-next>Siguiente</button></div></div>';
   panel.querySelectorAll('button').forEach(b=>b.style.cssText='min-height:44px;min-width:44px;border:1px solid #665c40;border-radius:8px;background:#20302c;color:white;cursor:pointer');
   const host=doc.getElementById('kelo-studio-live')||doc.body;host.append(panel);
-  let destroyed=false,busy=false,page=0,templates=[],observer=null;
+  let destroyed=false,busy=false,page=0,templates=[],observer=null,layoutObserver=null;
+  const toolbar=host.querySelector?.('.ks-top');
+  const layout=()=>{
+    const height=Number(root.visualViewport?.height||root.innerHeight)||844;
+    const headerBottom=Number(toolbar?.getBoundingClientRect?.().bottom)||112;
+    const top=Math.min(Math.max(12,headerBottom+8),Math.max(12,height-280));
+    panel.style.top=`${top}px`;
+    panel.style.maxHeight=`${Math.max(96,height-top-90)}px`;
+  };
+  layout();root.addEventListener?.('resize',layout);
+  if(toolbar&&root.ResizeObserver){layoutObserver=new root.ResizeObserver(layout);layoutObserver.observe(toolbar);}
   const controller={mode:'tileset',assetId:asset.id,panel,destroy};root.__KELO_TILESET_PICKER__=controller;
   observer=root.MutationObserver?new root.MutationObserver(()=>{if(!panel.isConnected)destroy();}):null;
   observer?.observe(doc.body,{childList:true,subtree:true});
@@ -35,7 +45,7 @@ export async function startTilesetLibraryPlacement({root=globalThis,session,asse
   if(destroyed||!panel.isConnected){destroy();return controller;}
   const grid=manifest?.grid||existing?.tileGrid||asset.tileGrid||{};
   for(const input of panel.querySelectorAll('[data-grid]'))input.value=grid[input.dataset.grid]??(input.dataset.grid==='tileWidth'||input.dataset.grid==='tileHeight'?32:0);
-  function destroy(){if(destroyed)return;destroyed=true;observer?.disconnect();panel.remove();if(root.__KELO_TILESET_PICKER__===controller)root.__KELO_TILESET_PICKER__=null;}
+  function destroy(){if(destroyed)return;destroyed=true;observer?.disconnect();layoutObserver?.disconnect();root.removeEventListener?.('resize',layout);panel.remove();if(root.__KELO_TILESET_PICKER__===controller)root.__KELO_TILESET_PICKER__=null;}
   function render(){
     const list=panel.querySelector('[data-tileset-tiles]');list.replaceChildren();
     const pages=Math.max(1,Math.ceil(templates.length/48));page=Math.min(page,pages-1);
