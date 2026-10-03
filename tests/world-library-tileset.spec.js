@@ -32,11 +32,12 @@ test('World uses a chosen Library tile and retains it after save and reopen',asy
   }},location.origin));
   const picker=page.locator('#kelo-tileset-picker');await expect(picker).toBeVisible();
   expect(await page.evaluate(()=>window.__tilesetQA.studio.tools.placement.getPreview())).toBeNull();
-  await picker.locator('[data-tileset-prepare]').click();
+  await expect(picker).toHaveCSS('pointer-events','auto');
+  await picker.locator('[data-tileset-prepare]').click({timeout:10000});
   await expect(picker.locator('[data-tile-template]')).toHaveCount(8,{timeout:15000});
   console.log('TILESET_QA_CELLS_READY');
   const chosen=picker.locator('[data-tile-template]').nth(1),templateId=await chosen.getAttribute('data-tile-template');
-  await chosen.click();
+  await chosen.click({timeout:10000});
   const ghost=await page.evaluate(()=>window.__tilesetQA.studio.tools.placement.getPreview());
   expect(ghost.prefabId).toBe(templateId);
   expect(await page.evaluate(id=>window.__tilesetQA.studio.adapter.assetCatalog.get(id).parts[0].source,templateId)).toEqual({x:32,y:0,w:32,h:32});
