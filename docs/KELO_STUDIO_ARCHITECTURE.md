@@ -59,7 +59,7 @@ La limpieza del minimapa heredado excluye `[data-kelo-studio-ui]`; de lo contrar
 - EDIT reabre assets sin borrar selección;
 - safe-area respetada;
 - blur/backdrop desactivable en coarse/mobile para proteger Safari.
-- el dock ApprovalRequest de World arranca plegado en móvil, accesible con el botón Aprobación para no tapar las tarjetas de Assets.
+- el dock ApprovalRequest de World arranca plegado en móvil y ocupa una fila propia en la barra superior. Al desplegarse sigue en esa fila. ResizeObserver reserva la altura real de la barra para los paneles inferiores; en horizontal la biblioteca completa se desplaza verticalmente para conservar todos sus controles.
 
 ## QA mínimo de World
 
