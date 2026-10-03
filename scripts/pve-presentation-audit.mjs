@@ -1,0 +1,4 @@
+import assert from 'node:assert/strict';import {createPvePresenter,mountGreenwildPresentation} from '../src/pve/pve-presentation.mjs';
+const ops=[];const ctx={save(){},restore(){},beginPath(){},ellipse(){},fill(){ops.push('fill')},arc(){},stroke(){ops.push('stroke')},fillRect(){ops.push('bar')},set globalAlpha(v){},set lineWidth(v){}};
+const p=createPvePresenter({ctx,camera:{x:0,y:0}});assert.equal(p.draw({x:10,y:20,hp:50,maxHp:100,state:'telegraph'}),true);assert.ok(ops.includes('stroke'));assert.ok(ops.filter(x=>x==='bar').length>=2);
+let cb;const render={afterFrame(o,fn){cb=fn;return'h'},unregister(){return true}};const mounted=mountGreenwildPresentation({encounter:{snapshot:()=>[{x:0,y:0,hp:1,maxHp:1,state:'idle'}]},presenter:p,render});cb();assert.equal(mounted.unmount(),true);console.log('pve-presentation-audit: ok');
