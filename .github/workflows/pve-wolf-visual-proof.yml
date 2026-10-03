@@ -1,0 +1,27 @@
+name: PvE Wolf Visual Proof
+on:
+  pull_request:
+    paths:
+      - 'src/pve/**'
+      - 'data/opengameart-cc0-curated.json'
+      - 'index.html'
+      - 'tests/pve-wolf-visual-proof.spec.js'
+      - '.github/workflows/pve-wolf-visual-proof.yml'
+jobs:
+  visual-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.20.0'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test tests/pve-wolf-visual-proof.spec.js --project=chromium
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pve-wolf-visual-proof
+          path: test-results/pve-wolf-proof.png

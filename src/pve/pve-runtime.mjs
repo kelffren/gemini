@@ -24,7 +24,7 @@ export function createSpawnPlan({encounterId='encounter',count=4,center={x:0,y:0
 
 export function createEnemyActor(spec={},options={}){
   const events=[],lootTable=options.lootTable||[],aggroRange=Math.max(32,Number(options.aggroRange)||260),attackRange=Math.max(16,Number(options.attackRange)||54),speed=Math.max(0,Number(options.speed)||70);
-  const actor={id:String(spec.spawnId||spec.id||'enemy'),x:Number(spec.x)||0,y:Number(spec.y)||0,hp:Number(spec.hp)||100,maxHp:Number(spec.hp)||100,state:'idle',stateMs:0,target:null,dead:false};
+  const actor={id:String(spec.spawnId||spec.id||'enemy'),family:String(spec.family||'beast'),rank:String(spec.rank||'normal'),tier:Number(spec.tier)||1,x:Number(spec.x)||0,y:Number(spec.y)||0,hp:Number(spec.hp)||100,maxHp:Number(spec.hp)||100,state:'idle',stateMs:0,target:null,dead:false};
   const emit=(type,payload={})=>{const row=F({type,enemyId:actor.id,...payload});events.push(row);globalThis.KeloEvents?.emit?.('kelo:pve:'+type,row)};
   function setState(next){if(actor.state===next)return;actor.state=next;actor.stateMs=0;emit('enemy-state',{state:next})}
   return F({
