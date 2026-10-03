@@ -9,7 +9,8 @@ const {test,expect}=require('@playwright/test');
 const iphone='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 test('Approval stays above Library when collapsed, expanded and rotated',async({browser})=>{
   const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true,userAgent:iphone});
-  await page.goto(process.env.KELO_PAGES||'http://127.0.0.1:4173/');
+  // A same-origin blank fixture avoids unrelated game/auth loops while exercising real UI owners.
+  await page.goto(new URL('./__kelo_world_approval_layout_fixture__',process.env.KELO_PAGES||'http://127.0.0.1:4173/').href);
   await page.evaluate(async()=>{
     // Exercise real UI owners independently of gameplay/auth/network latency.
     document.body.innerHTML='';
