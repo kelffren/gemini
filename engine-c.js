@@ -95,6 +95,8 @@ function quickTravel(dest) {
   else if (dest === 'farm') { teleportToFarm(); showToast('Distrito Rural'); }
   else if (dest === 'house') { teleportToPlot(); showToast('Tu parcela'); }
   else if (dest === 'arena') { const x=arenaPvP.x+80,y=arenaPvP.y+arenaPvP.h/2; transitionPlayer(x,y,'engine-c:quick-travel-arena'); window.KeloCamera.setTarget(arenaPvP.x + arenaPvP.w / 2, arenaPvP.y + arenaPvP.h / 2, { source:'engine-c:quick-travel-arena' }); showToast('Arena 1v1'); }
+  else if (dest === 'map2') { if(window.KELO_WORLD_ZONES?.enterMap2) window.KELO_WORLD_ZONES.enterMap2(); else showToast('Mapa 2 todavía cargando'); }
+  else if (dest === 'map2-return') { if(window.KELO_WORLD_ZONES?.returnPlaza) window.KELO_WORLD_ZONES.returnPlaza(); else quickTravel('plaza'); }
 }
 checkFarmTouch = function(sx, sy) {
   if (decorationResetActive()) return false;
