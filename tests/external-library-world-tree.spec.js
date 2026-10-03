@@ -14,6 +14,12 @@ test('external Kenney tree reaches World Studio canvas and screenshot',async({pa
   await page.evaluate(()=>document.querySelector('#kelo-studio-live [data-act="edit-assets"]')?.click());
   await page.waitForTimeout(500);
   const popupPromise=context.waitForEvent('page');
+  await page.evaluate(async()=>{
+    if([...document.querySelectorAll('#kelo-studio-live button')].some(b=>b.textContent?.includes('BIBLIOTECA EXTERNA')))return;
+    const mod=await import('./src/studio/ui/studio-asset-palette.mjs?v=qa-external-tree');
+    window.__qaExternalPalette=mod.createStudioAssetPalette({root:window,getAssets:()=>[]});
+    window.__qaExternalPalette.attach();
+  });
   await page.waitForFunction(()=>[...document.querySelectorAll('#kelo-studio-live button')].some(b=>b.textContent?.includes('BIBLIOTECA EXTERNA')),null,{timeout:10000});
   await page.locator('#kelo-studio-live button').filter({hasText:'BIBLIOTECA EXTERNA'}).click({force:true});
   const vault=await popupPromise; await vault.waitForLoadState('domcontentloaded');
