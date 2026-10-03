@@ -8,6 +8,8 @@ on:
       - 'src/studio/integration/live-studio-controller.mjs'
       - 'src/studio/ui/studio-asset-palette.mjs'
       - '.github/workflows/external-library-world-tree-qa.yml'
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
