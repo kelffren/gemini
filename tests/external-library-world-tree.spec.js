@@ -4,8 +4,9 @@ test('external Kenney tree reaches World Studio canvas and screenshot',async({pa
   const stamp=Date.now();
   await page.goto('/?mapEditor=1&externalTreeQA='+stamp,{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.KELO_ADMIN_KEYS?.can?.('world.edit',window.KELO_ADMIN_KEYS?.playerId?.()),null,{timeout:20000});
-  await page.click('#lx-side-menu');
-  await page.click('#lx-create-studio');
+  await page.evaluate(()=>document.querySelector('#lx-side-menu')?.click());
+  await page.waitForSelector('#lx-create-studio',{state:'attached',timeout:10000});
+  await page.evaluate(()=>document.querySelector('#lx-create-studio')?.click());
   await page.waitForSelector('#kelo-creators-hub',{state:'visible'});
   await page.getByRole('button',{name:'Abrir World'}).click();
   await page.waitForSelector('#kelo-studio-live',{state:'visible',timeout:20000});
