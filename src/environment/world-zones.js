@@ -7,7 +7,14 @@
 'use strict';
 const layers=window.KELO_ENVIRONMENT_LAYERS;
 if(!layers?.register){console.error('[Kelo zones] environment layers unavailable');return;}
-const MAP2=Object.freeze({id:'sketch-town-test',name:'Sketch Town · Mapa 2',x:2280,y:180,w:1120,h:900,spawn:{x:2820,y:650}});
+const MAP2=Object.freeze({id:'kenney-town-test',name:'Kenney Town · Mapa 2',x:2280,y:180,w:1120,h:900,spawn:{x:2820,y:650}});
+const REAL_MAPS=Object.freeze([
+  Object.freeze({id:'tiny-town',name:'Tiny Town',src:'https://raw.githubusercontent.com/GeorgeQLe/assets-2d-city/main/assets/kenney/tiny-town/Sample.png'}),
+  Object.freeze({id:'rpg-urban',name:'RPG Urban',src:'https://raw.githubusercontent.com/GeorgeQLe/assets-2d-city/main/assets/kenney/rpg-urban-pack/Sample.png'}),
+  Object.freeze({id:'retro-urban',name:'Retro Urban',src:'https://raw.githubusercontent.com/GeorgeQLe/assets-2d-city/main/assets/kenney/retro-urban-kit/Sample.png'})
+]);
+let selectedMap=0;
+const mapImages=REAL_MAPS.map(function(def){const img=new Image();img.crossOrigin='anonymous';img.decoding='async';img.src=def.src;return img;});
 const PLAZA_SPAWN=Object.freeze({x:1400,y:1600});
 let active='plaza',cooldownUntil=0;
 const PLAZA_PORTAL=Object.freeze({x:1710,y:1570,r:54,label:'MAPA 2'});
@@ -27,21 +34,20 @@ function drawPlazaPortal(g){if(active==='plaza')drawPortal(g,PLAZA_PORTAL,PLAZA_
 layers.register({id:'kelo-plaza-map2-portal',phase:'props_front',priority:95,required:false,ownership:'KELO_WORLD_ZONES',draw:drawPlazaPortal,bounds:[{id:'plaza-map2-portal',x:PLAZA_PORTAL.x-60,y:PLAZA_PORTAL.y-60,w:120,h:150}]});
 function drawTown(g){
   if(active!=='map2')return;
-  const r=MAP2;
+  const r=MAP2,img=mapImages[selectedMap],def=REAL_MAPS[selectedMap];
   g.save();
-  g.fillStyle='#9fcf72';g.fillRect(r.x,r.y,r.w,r.h);
-  g.fillStyle='#d9c79d';
-  g.fillRect(r.x+80,r.y+390,r.w-160,120);
-  g.fillRect(r.x+500,r.y+70,120,r.h-140);
-  g.fillStyle='#79b8d1';g.fillRect(r.x+40,r.y+80,210,250);
-  g.fillStyle='#6d9f4b';
-  [[300,120],[360,180],[850,120],[930,210],[180,650],[890,680],[1020,590]].forEach(([x,y])=>{g.beginPath();g.arc(r.x+x,r.y+y,38,0,Math.PI*2);g.fill();});
-  const houses=[[300,270,150,110],[690,230,170,125],[250,580,180,130],[680,590,190,135]];
-  for(const [x,y,w,h] of houses){g.fillStyle='#d8b06f';g.fillRect(r.x+x,r.y+y,w,h);g.fillStyle='#8d5542';g.beginPath();g.moveTo(r.x+x-12,r.y+y);g.lineTo(r.x+x+w/2,r.y+y-65);g.lineTo(r.x+x+w+12,r.y+y);g.closePath();g.fill();}
-  g.fillStyle='#efe5bd';g.fillRect(r.x+470,r.y+360,180,180);
+  g.fillStyle='#17221b';g.fillRect(r.x,r.y,r.w,r.h);
+  if(img&&img.complete&&img.naturalWidth){
+    const scale=Math.min((r.w-80)/img.naturalWidth,(r.h-130)/img.naturalHeight);
+    const w=img.naturalWidth*scale,h=img.naturalHeight*scale;
+    g.imageSmoothingEnabled=false;
+    g.drawImage(img,r.x+(r.w-w)/2,r.y+85+(r.h-115-h)/2,w,h);
+  }else{
+    g.fillStyle='#d7c89b';g.font='bold 24px sans-serif';g.textAlign='center';g.fillText('Cargando mapa CC0…',r.x+r.w/2,r.y+r.h/2);
+  }
   g.strokeStyle='#6c5b45';g.lineWidth=3;g.strokeRect(r.x,r.y,r.w,r.h);
-  g.fillStyle='rgba(10,18,14,.78)';g.fillRect(r.x+20,r.y+18,260,44);
-  g.fillStyle='#fff';g.font='bold 22px sans-serif';g.fillText('MAPA 2 · SKETCH TOWN',r.x+34,r.y+48);
+  g.fillStyle='rgba(10,18,14,.88)';g.fillRect(r.x+20,r.y+18,420,48);
+  g.fillStyle='#fff';g.font='bold 21px sans-serif';g.textAlign='left';g.fillText('MAPA 2 · '+def.name.toUpperCase(),r.x+34,r.y+50);
   drawPortal(g,MAP2_PORTAL,MAP2_PORTAL.label);
   g.restore();
 }
@@ -64,7 +70,7 @@ function tick(){
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
-window.KELO_WORLD_ZONES=Object.freeze({version:'zones-v1-proof',maps:Object.freeze({plaza:Object.freeze({id:'plaza',name:'Plaza Central'}),map2:MAP2}),get active(){return active;},enterMap2,returnPlaza,go(id){return id==='map2'?enterMap2():returnPlaza();}});
+window.KELO_WORLD_ZONES=Object.freeze({version:'zones-v2-real-cc0-maps',realMaps:REAL_MAPS,selectMap(id){const i=REAL_MAPS.findIndex(m=>m.id===id);if(i>=0)selectedMap=i;return REAL_MAPS[selectedMap];},get selectedMap(){return REAL_MAPS[selectedMap];},maps:Object.freeze({plaza:Object.freeze({id:'plaza',name:'Plaza Central'}),map2:MAP2}),get active(){return active;},enterMap2,returnPlaza,go(id){return id==='map2'?enterMap2():returnPlaza();}});
 window.addEventListener('kelo:world-zone-map2',enterMap2);
 window.addEventListener('kelo:world-zone-plaza',returnPlaza);
 })();
