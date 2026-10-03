@@ -13,8 +13,9 @@ function decorationResetActive() {
   return window.KELO_WORLD_DECORATION_RESET === true || window.KELO_WORLD_RENDERER?.decorationReset === true;
 }
 function screenToWorld(sx, sy) {
-  const z = CONFIG.zoom || 1;
-  return { x: camera.x + (sx - screenW / 2) / z, y: camera.y + (sy - screenH / 2) / z };
+  if (window.KeloCamera && typeof window.KeloCamera.screenToWorld === 'function') return window.KeloCamera.screenToWorld(sx, sy);
+  const z = CONFIG.zoom || 1, yz = z * 0.78;
+  return { x: camera.x + (sx - screenW / 2) / z, y: camera.y + (sy - screenH / 2) / yz };
 }
 function cycleZoom() {
   const i = ZOOM_STEPS.indexOf(CONFIG.zoom);
@@ -137,12 +138,13 @@ handleBuildGridTap = function(sx, sy) {
   saveState();
 };
 window.KELO_LEGACY_RENDER_BRIDGE=Object.freeze({
-  version:'engine-c-render-bridge-v1',
+  version:'engine-c-render-bridge-v2-isometric-2-5d',
   drawFrame:function(){
     const reset = decorationResetActive();
     ctx.fillStyle = reset ? '#ffffff' : '#07090d'; ctx.fillRect(0, 0, screenW, screenH);
     const z = CONFIG.zoom || 1;
-    ctx.save(); ctx.translate(screenW / 2, screenH / 2); ctx.scale(z, z); ctx.translate(-camera.x, -camera.y);
+    const worldYScale = window.KeloCamera?.getWorldYScale?.() || 0.78;
+    ctx.save(); ctx.translate(screenW / 2, screenH / 2); ctx.scale(z, z * worldYScale); ctx.translate(-camera.x, -camera.y);
     if (window.KeloScreenFX && typeof window.KeloScreenFX.applyWorldTransform === 'function') window.KeloScreenFX.applyWorldTransform(ctx);
     let worldDrawn = false;
     if (window.KELO_WORLD_RENDERER && typeof window.KELO_WORLD_RENDERER.draw === 'function') {

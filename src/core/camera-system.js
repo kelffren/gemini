@@ -16,7 +16,8 @@
   if(root.KeloCamera)return;
   if(typeof camera==='undefined'||typeof CONFIG==='undefined'||typeof canvas==='undefined'||typeof ctx==='undefined')throw new Error('KeloCamera: legacy camera/canvas core unavailable');
 
-  const VERSION='kelo-camera-v1.11.0-pvp-live-action-director-a';
+  const VERSION='kelo-camera-v1.12.0-isometric-2-5d';
+  const WORLD_Y_SCALE=0.78; // 2.5D/isometric-biased presentation: physics remains Cartesian
   const ZOOM_PRESETS=Object.freeze([0.7,0.82,1]);
   const TUNING_KEYS=Object.freeze(['dampX','dampY','deadXRatio','deadYRatio','lookAheadDist','lookAheadDecay']);
   const SCREEN_SPACE_DEADZONE_KEYS=new Set(['deadXRatio','deadYRatio']);
@@ -75,9 +76,9 @@
   function restoreState(value,options){const v=value||{},opts=options||{};const x=Number(v.x),y=Number(v.y),tx=Number(v.targetX),ty=Number(v.targetY);if(!Number.isFinite(x)||!Number.isFinite(y))return false;clearActionFramingOffset();camera.x=x;camera.y=y;managedTargetX=Number.isFinite(tx)?tx:x;managedTargetY=Number.isFinite(ty)?ty:y;if(Number.isFinite(Number(v.lookOffsetX)))camera.lookOffsetX=Number(v.lookOffsetX);else if(opts.resetLook!==false)camera.lookOffsetX=0;if(Number.isFinite(Number(v.lookOffsetY)))camera.lookOffsetY=Number(v.lookOffsetY);else if(opts.resetLook!==false)camera.lookOffsetY=0;emit('kelo:camerarestore',{source:opts.source||'restore',x,y,targetX:managedTargetX,targetY:managedTargetY});return true;}
   function setFollowTuning(next){const values=next||{};for(const key of TUNING_KEYS){const value=Number(values[key]);if(Number.isFinite(value))managedTuning[key]=value;}return getFollowTuning();}
   function getFollowTuning(){return Object.freeze(Object.fromEntries(TUNING_KEYS.map(key=>[key,managedTuning[key]])));}
-  function screenToWorldPoint(sx,sy){const z=effectiveZoom||1;return{x:camera.x+(Number(sx)-screenW/2)/z,y:camera.y+(Number(sy)-screenH/2)/z};}
-  function worldToScreenPoint(wx,wy){const z=effectiveZoom||1;return{x:(Number(wx)-camera.x)*z+screenW/2,y:(Number(wy)-camera.y)*z+screenH/2};}
-  function worldView(){const z=effectiveZoom||1,w=screenW/z,h=screenH/z,cx=Number(camera.x)||0,cy=Number(camera.y)||0,left=cx-w/2,top=cy-h/2;return Object.freeze({x:left,y:top,w,h,left,top,right:left+w,bottom:top+h,centerX:cx,centerY:cy,zoom:z,screenW,screenH});}
+  function screenToWorldPoint(sx,sy){const z=effectiveZoom||1,yz=z*WORLD_Y_SCALE;return{x:camera.x+(Number(sx)-screenW/2)/z,y:camera.y+(Number(sy)-screenH/2)/yz};}
+  function worldToScreenPoint(wx,wy){const z=effectiveZoom||1,yz=z*WORLD_Y_SCALE;return{x:(Number(wx)-camera.x)*z+screenW/2,y:(Number(wy)-camera.y)*yz+screenH/2};}
+  function worldView(){const z=effectiveZoom||1,yz=z*WORLD_Y_SCALE,w=screenW/z,h=screenH/yz,cx=Number(camera.x)||0,cy=Number(camera.y)||0,left=cx-w/2,top=cy-h/2;return Object.freeze({x:left,y:top,w,h,left,top,right:left+w,bottom:top+h,centerX:cx,centerY:cy,zoom:z,worldYScale:WORLD_Y_SCALE,projection:'2.5d-isometric-biased',screenW,screenH});}
   function axisReversing(inputAxis,lookOffset){return Math.abs(Number(inputAxis)||0)>REVERSAL_EPSILON&&Math.abs(Number(lookOffset)||0)>REVERSAL_EPSILON&&Number(inputAxis)*Number(lookOffset)<0;}
   function combatSnapshot(){try{return root.KeloInput?.combat?.snapshot?.()||null;}catch(e){return null;}}
   function setPvPDirectorIntent(value){
@@ -184,6 +185,6 @@
   root.addEventListener('resize',()=>scheduleViewportSync('resize'),{passive:true});
   root.visualViewport?.addEventListener('resize',()=>scheduleViewportSync('visualViewport'),{passive:true});
 
-  root.KeloCamera=Object.freeze({version:VERSION,setTarget,focus,restoreState,setFollowTuning,getFollowTuning,setBaseZoom,getBaseZoom:()=>baseZoom,getEffectiveZoom:()=>effectiveZoom,cycleZoom,refreshZoom,getOrientation:orientation,configureViewport,syncViewport,scheduleViewportSync,syncViewportCss,activeDpr,pixelPerfectZoom,screenToWorld:screenToWorldPoint,worldToScreen:worldToScreenPoint,worldView,setPvPDirectorIntent,clearPvPDirectorIntent,pulsePvPImpact,snapshot});
-  root.KELO_CAMERA_AUDIT=Object.freeze({version:VERSION,owner:'KeloCamera',legacyFollowMath:true,screenSpaceDeadZone:true,lookAheadReversalResponse:true,lookAheadReversalDecayMultiplier:LOOKAHEAD_REVERSAL_DECAY_MULTIPLIER,pvpAimComposition:true,pvpAimPerpWeight:PVP_AIM_PERP_WEIGHT,pvpStationaryActionFraming:true,pvpStationaryActionLeadPx:PVP_ACTION_SCREEN_LEAD_PX,pvpStationaryActionDodgeReleaseDecay:PVP_ACTION_DODGE_RELEASE_DECAY,pvpStationaryActionStrafeReleaseDecay:PVP_ACTION_STRAFE_RELEASE_DECAY,pvpStationaryActionStrafeReleaseDot:PVP_ACTION_STRAFE_RELEASE_DOT,pvpLiveActionDirector:true,pvpDirectorConfig:PVP_DIRECTOR,legacyTargetAdapter:true,legacyZoomAdapter:true,legacyTuningAdapter:true,updateCameraOwner:true,viewportOwner:true,zoomOwner:true,targetOwner:true,restoreOwner:true,screenWorldOwner:true,worldViewOwner:true});
+  root.KeloCamera=Object.freeze({version:VERSION,setTarget,focus,restoreState,setFollowTuning,getFollowTuning,setBaseZoom,getBaseZoom:()=>baseZoom,getEffectiveZoom:()=>effectiveZoom,cycleZoom,refreshZoom,getOrientation:orientation,configureViewport,syncViewport,scheduleViewportSync,syncViewportCss,activeDpr,pixelPerfectZoom,screenToWorld:screenToWorldPoint,worldToScreen:worldToScreenPoint,worldView,getWorldYScale:()=>WORLD_Y_SCALE,setPvPDirectorIntent,clearPvPDirectorIntent,pulsePvPImpact,snapshot});
+  root.KELO_CAMERA_AUDIT=Object.freeze({version:VERSION,owner:'KeloCamera',legacyFollowMath:true,screenSpaceDeadZone:true,lookAheadReversalResponse:true,lookAheadReversalDecayMultiplier:LOOKAHEAD_REVERSAL_DECAY_MULTIPLIER,pvpAimComposition:true,pvpAimPerpWeight:PVP_AIM_PERP_WEIGHT,pvpStationaryActionFraming:true,pvpStationaryActionLeadPx:PVP_ACTION_SCREEN_LEAD_PX,pvpStationaryActionDodgeReleaseDecay:PVP_ACTION_DODGE_RELEASE_DECAY,pvpStationaryActionStrafeReleaseDecay:PVP_ACTION_STRAFE_RELEASE_DECAY,pvpStationaryActionStrafeReleaseDot:PVP_ACTION_STRAFE_RELEASE_DOT,pvpLiveActionDirector:true,pvpDirectorConfig:PVP_DIRECTOR,legacyTargetAdapter:true,legacyZoomAdapter:true,legacyTuningAdapter:true,updateCameraOwner:true,viewportOwner:true,zoomOwner:true,targetOwner:true,restoreOwner:true,screenWorldOwner:true,worldViewOwner:true,isometricBiasedProjection:true,worldYScale:WORLD_Y_SCALE});
 })(typeof globalThis!=='undefined'?globalThis:window);
