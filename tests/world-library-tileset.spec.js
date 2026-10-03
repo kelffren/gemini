@@ -10,12 +10,14 @@ test('World uses a chosen Library tile and retains it after save and reopen',asy
   test.setTimeout(90000);
   const errors=[];page.on('pageerror',e=>errors.push(String(e)));
   page.on('console',m=>{if(m.text().includes('draft import deferred'))console.log('TILESET_IMPORT_WARNING',m.text());});
-  await page.goto('./?guest=1&mapEditor=1&tilesetQA=1',{waitUntil:'domcontentloaded'});
+  await page.goto('./?guest=1&mapEditor=1&tilesetQA=1',{waitUntil:'load'});
   await page.evaluate(async()=>{
     const {bootKeloCreators}=await import('./src/creators/creator-entry.mjs');
     const platform=await bootKeloCreators({root:window});
-    window.__tilesetQA=await platform.openWorkspace('world');
+    window.__tilesetPlatform=platform;
   });
+  await page.waitForFunction(()=>window.__keloBootReady&&window.KELO_ADMIN_KEYS?.can?.('world.edit'),null,{timeout:20000});
+  await page.evaluate(async()=>{window.__tilesetQA=await window.__tilesetPlatform.openWorkspace('world');});
   console.log('TILESET_QA_OPENED');
   await expect(page.locator('#kelo-studio-live')).not.toHaveAttribute('data-kelo-world-loading','1',{timeout:25000});
   await page.waitForFunction(()=>document.querySelector('#kelo-studio-live')?.dataset.keloWorldHydrated==='1',null,{timeout:15000});
