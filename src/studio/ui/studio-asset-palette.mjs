@@ -182,6 +182,14 @@ export function createStudioAssetPalette({root=globalThis,getAssets=()=>[],onSel
   function openLegacyLibrary(){
     close();
     if(!shell)return false;
+    // The full library is the canonical Universal Content Vault. Opening it with
+    // an opener preserves the existing kelo:build-personal-content handoff back
+    // into this Studio session without creating a parallel placement system.
+    try{
+      const url=new URL('asset-vault.html?from=studio',root.location?.href||globalThis.location?.href);
+      const win=root.open?.(url.href,'kelo-asset-vault');
+      if(win){try{win.focus?.();}catch{}return true;}
+    }catch(error){console.warn('[Kelo Studio] external library open failed',error);}
     if(!isMobile()){shell.classList.add('ks-clean-show-assets');shell.classList.remove('ks-clean-show-inspector');return true;}
     const legacy=[...shell.querySelectorAll('[data-act="edit-assets"]')].find(node=>!node.closest('.ks-asset-palette'))||null;
     if(!legacy)return false;
@@ -197,7 +205,7 @@ export function createStudioAssetPalette({root=globalThis,getAssets=()=>[],onSel
       <div class="ks-asset-palette-search-wrap"><input class="ks-asset-palette-search" type="search" autocomplete="off" spellcheck="false" placeholder="Buscar árbol, camino, fuente…"></div>
       <div class="ks-asset-palette-cats" aria-label="Carpetas de assets"></div>
       <div class="ks-asset-palette-grid"></div>
-      <div class="ks-asset-palette-foot"><span>TOCA UN ASSET → COLOCAR</span><button type="button" class="ks-asset-palette-library" data-asset-palette-library>BIBLIOTECA COMPLETA</button></div>`;
+      <div class="ks-asset-palette-foot"><span>TOCA UN ASSET → COLOCAR</span><button type="button" class="ks-asset-palette-library" data-asset-palette-library>BIBLIOTECA EXTERNA</button></div>`;
     shell.appendChild(palette);
     const search=palette.querySelector('.ks-asset-palette-search');
     search.addEventListener('input',()=>{query=search.value;render();});
