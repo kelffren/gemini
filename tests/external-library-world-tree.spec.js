@@ -14,12 +14,12 @@ test('external Kenney tree reaches World Studio canvas and screenshot',async({pa
   await page.locator('[data-preview-act="place"]').click();
   await page.waitForURL(/buildAsset=/,{timeout:30000});
   await page.waitForSelector('#kelo-studio-live',{state:'visible',timeout:30000});
-  await page.waitForFunction(()=>/^(PLACEMENT|PREFAB)/.test(document.querySelector('#kelo-studio-live .ks-status')?.textContent||''),null,{timeout:30000});
-  const before=await page.locator('#kelo-studio-live .ks-status').textContent();
+  await page.waitForTimeout(2500);
+  const before=await page.evaluate(async()=>{const m=await import('./src/studio/studio-entry.mjs');return m.getKeloStudioSession?.()?.kernel?.document?.entities?.length||0;});
   await page.mouse.click(195,420);
-  await page.waitForTimeout(1800);
-  const after=await page.locator('#kelo-studio-live .ks-status').textContent();
-  expect(after).not.toBe(before);
+  await page.waitForTimeout(2200);
+  const after=await page.evaluate(async()=>{const m=await import('./src/studio/studio-entry.mjs');return m.getKeloStudioSession?.()?.kernel?.document?.entities?.length||0;});
+  expect(after).toBeGreaterThan(before);
   await page.screenshot({path:'test-results/external-library-tree-world.png',fullPage:false});
-  console.log(JSON.stringify({asset:name,provider,status:after,screenshot:'test-results/external-library-tree-world.png'}));
+  console.log(JSON.stringify({asset:name,provider,objects:after,screenshot:'test-results/external-library-tree-world.png'}));
 });
