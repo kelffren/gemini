@@ -1,0 +1,37 @@
+name: Normalize External Wolf Asset
+on:
+  pull_request:
+    paths: ['.github/workflows/normalize-external-wolf.yml']
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install pillow
+      - name: Fetch and normalize selected external asset
+        run: |
+          curl -L --fail --retry 3 'https://opengameart.org/sites/default/files/Wolfpack.png' -o /tmp/wolfpack.png
+          python3 - <<'PY'
+          from PIL import Image
+          im=Image.open('/tmp/wolfpack.png').convert('RGBA')
+          # Curated profile: first brown wolf frame is cell 0,0 in the 32px grid.
+          frame=im.crop((0,0,32,32))
+          # Normalize a flat opaque matte if the source uses one instead of alpha.
+          px=list(frame.getdata())
+          corners=[frame.getpixel((0,0)),frame.getpixel((31,0)),frame.getpixel((0,31)),frame.getpixel((31,31))]
+          from collections import Counter
+          bg=Counter(corners).most_common(1)[0][0]
+          if bg[3]==255:
+            tol=18
+            out=[]
+            for p in px:
+              if all(abs(p[i]-bg[i])<=tol for i in range(3)): out.append((p[0],p[1],p[2],0))
+              else: out.append(p)
+            frame.putdata(out)
+          frame.save('wolf-normalized.png',optimize=True)
+          print('source',im.size,'frame',frame.size,'bg',bg)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wolf-normalized
+          path: wolf-normalized.png
