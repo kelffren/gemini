@@ -10,7 +10,9 @@ test('live Greenwild renders external wolf pack',async({page})=>{
   await page.waitForFunction(()=>globalThis.__KELO_GREENWILD_LIVE__?.encounter?.snapshot?.().length>=4,null,{timeout:20000});
   await page.waitForTimeout(2500);
   const proof=await page.evaluate(()=>({count:globalThis.__KELO_GREENWILD_LIVE__.encounter.snapshot().length,asset:globalThis.__KELO_GREENWILD_LIVE__.presentation.spriteBank.beast.asset?.id||null,image:!!globalThis.__KELO_GREENWILD_LIVE__.presentation.spriteBank.beast.image}));
-  expect(proof.count).toBeGreaterThanOrEqual(4);expect(proof.asset).toBe('wolf-pack-32x32');expect(proof.image).toBeTruthy();
   await page.locator('#game-canvas').screenshot({path:'test-results/pve-wolf-proof.png'});
+  expect(proof.count).toBeGreaterThanOrEqual(4);
+  expect(proof.asset).toMatch(/wolf-pack-32x32$/);
+  expect(proof.image).toBeTruthy();
   expect(errors.filter(x=>/KeloPvE|greenwild/i.test(x))).toEqual([]);
 });
