@@ -30,6 +30,7 @@ test('Approval stays above Library when collapsed, expanded and rotated',async({
     for(const expanded of [false,true]){
       if(await toggle.getAttribute('aria-expanded')!==String(expanded))await toggle.click();
       await expect(toggle).toBeVisible();
+      await page.evaluate(()=>window.palette.open());
       await expect.poll(async()=>{
         const a=await dock.boundingBox(),b=await page.locator('.ks-asset-palette').boundingBox();
         return a.y+a.height<=b.y;

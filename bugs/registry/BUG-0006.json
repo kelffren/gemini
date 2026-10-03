@@ -84,10 +84,13 @@
       "validation": {
         "environment": "local Playwright iPhone",
         "method": "world-approval-library-layout.spec.js and main-stability-mobile.spec.js",
-        "result": "NOT_RUN",
-        "evidence": []
+        "result": "PARTIAL",
+        "evidence": [
+          "Playwright layout regression passed locally with real UI modules bundled into an offline harness: 390\u00d7844, 430\u00d7932, 844\u00d7390; collapsed/expanded and Library hit-testing.",
+          "Full-game local navigation blocked by environment socket restrictions; exact build CI remains required."
+        ]
       },
-      "conclusion": "Candidate layout; validation in progress."
+      "conclusion": "Separate hit regions pass the local UI harness; full-game and LIVE phone validation pending."
     }
   ],
   "next_best_actions": [
@@ -110,7 +113,7 @@
   },
   "verification": {
     "status": "PENDING",
-    "method": null,
+    "method": "Local layout harness plus exact PR build main-stability-gate; physical iPhone LIVE remains pending.",
     "evidence": [],
     "verified_by": null,
     "verified_at": null
