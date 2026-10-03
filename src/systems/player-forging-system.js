@@ -154,7 +154,18 @@ function forge(templateId,options){
   const item=catalog.createItem(templateId,{id:opts.id||randomId('crafted'),createdAt});
   if(!item)return{ok:false,error:'UNKNOWN_EQUIPMENT_TEMPLATE'};
   ensureForge(item,opts);
-  return{ok:true,item,summary:inspect(item)};
+  const profession=root&&root.KeloArtisanProfession;
+  if(profession&&typeof profession.getForgeModifiers==='function'){
+    const mods=profession.getForgeModifiers(opts.creator&&opts.creator.id);
+    if(mods){
+      item.forge.profession={rankId:mods.rankId,rankName:mods.rankName,qualityBonus:mods.qualityBonus,socketBonus:mods.socketBonus};
+      item.quality=Math.max(1,Math.floor(Number(item.quality)||1)+Math.max(0,Math.floor(Number(mods.qualityBonus)||0)));
+      if(opts.socketCount==null&&mods.socketBonus>0){item.forge.socketCount=clamp(DEFAULT_SOCKETS+mods.socketBonus,0,MAX_SOCKETS);ensureForge(item,opts);}
+    }
+  }
+  const summary=inspect(item);
+  if(opts.recordProfession!==false&&profession&&typeof profession.recordCraft==='function'){try{profession.recordCraft(item,opts.creator);}catch(_){}}
+  return{ok:true,item,summary};
 }
 function rename(item,name){
   try{ensureForge(item);item.forge.customName=cleanName(name,item.name);ensureForge(item);return{ok:true,item,summary:inspect(item)};}
