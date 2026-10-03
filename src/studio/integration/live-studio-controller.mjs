@@ -431,7 +431,7 @@ export async function openKeloStudioLive({root=globalThis}={}){
     const BUILD_HANDOFF_KEY='kelo.library.build.pending.v1',PALETTE_HANDOFF_KEY='kelo.library.palette.pending.v1';
     const consumeExternalBuild=async(id)=>{
       id=String(id||'').trim();if(!id)return false;
-      const bridge=await import('./library-build-bridge.mjs?v=external-studio-handoff-1');
+      const bridge=await import('./library-build-bridge.mjs?v=external-studio-handoff-1-tileset-grid');
       const result=await bridge.startPersonalAssetPlacement({root,session:liveSession,assetId:id});
       try{shell?.closeAssets?.();}catch{}
       try{(assetPalette||studio.assetPalette)?.close?.();}catch{}
@@ -440,7 +440,7 @@ export async function openKeloStudioLive({root=globalThis}={}){
     };
     const consumeExternalPalette=async(ids)=>{
       const list=[...new Set((Array.isArray(ids)?ids:[]).map(String).filter(Boolean))];if(list.length<2)return false;
-      const bridge=await import('./library-build-bridge.mjs?v=external-studio-handoff-1');
+      const bridge=await import('./library-build-bridge.mjs?v=external-studio-handoff-1-tileset-grid');
       const result=await bridge.startPersonalAssetPalette({root,session:liveSession,assetIds:list});
       try{shell?.closeAssets?.();}catch{}
       toast(root,`Paleta externa lista · ${list.length} assets`);
