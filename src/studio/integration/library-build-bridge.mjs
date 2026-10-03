@@ -102,7 +102,14 @@ export function choosePersonalBuildTemplate(rows=[],templateId=null){
   return list.find(row=>row.placeable!==false)||list[0]||null;
 }
 async function ensurePersonalVisualRegistered(root,assetId){
-  const bridge=root?.KELO_PERSONAL_ASSET_RUNTIME_BRIDGE;
+  let bridge=root?.KELO_PERSONAL_ASSET_RUNTIME_BRIDGE;
+  if(typeof bridge?.registerPersonalAsset!=='function'){
+    try{
+      const mod=await import('../../creators/assets/personal-asset-runtime-bridge.mjs?v=external-studio-handoff-1');
+      if(typeof mod?.registerPersonalAsset==='function')return mod.registerPersonalAsset(root,String(assetId));
+    }catch(error){console.warn('[Kelo library build] personal runtime bridge unavailable',error);}
+    bridge=root?.KELO_PERSONAL_ASSET_RUNTIME_BRIDGE;
+  }
   if(typeof bridge?.registerPersonalAsset!=='function')return false;
   return bridge.registerPersonalAsset(root,String(assetId));
 }

@@ -8,7 +8,14 @@
       "name": "Simple Character Base [16x16]",
       "contentKind": "animation",
       "category": "character-animation",
-      "tags": ["pixel", "character", "spritesheet", "movement", "16x16", "animation"],
+      "tags": [
+        "pixel",
+        "character",
+        "spritesheet",
+        "movement",
+        "16x16",
+        "animation"
+      ],
       "author": "zaphgames",
       "license": "CC0",
       "attributionRequired": false,
@@ -24,7 +31,14 @@
       "name": "Universal 8x8 Tileset",
       "contentKind": "tileset",
       "category": "tileset",
-      "tags": ["top-down", "8x8", "tiles", "tileset", "pixel-art", "minimal"],
+      "tags": [
+        "top-down",
+        "8x8",
+        "tiles",
+        "tileset",
+        "pixel-art",
+        "minimal"
+      ],
       "author": "Drummyfish",
       "license": "CC0",
       "attributionRequired": false,
@@ -40,7 +54,12 @@
       "name": "Gold Coin / Token",
       "contentKind": "sprite",
       "category": "item",
-      "tags": ["coin", "item", "currency", "pixel-art"],
+      "tags": [
+        "coin",
+        "item",
+        "currency",
+        "pixel-art"
+      ],
       "author": "BizmasterStudios",
       "license": "CC0",
       "attributionRequired": false,
@@ -56,7 +75,13 @@
       "name": "Click UI SFX",
       "contentKind": "sfx",
       "category": "sfx",
-      "tags": ["click", "ui", "interface", "button", "sound"],
+      "tags": [
+        "click",
+        "ui",
+        "interface",
+        "button",
+        "sound"
+      ],
       "author": "frosty ham",
       "license": "CC0",
       "attributionRequired": false,
@@ -72,7 +97,13 @@
       "name": "Forest Ambience",
       "contentKind": "ambience",
       "category": "ambience",
-      "tags": ["forest", "nature", "birds", "ambient", "loop"],
+      "tags": [
+        "forest",
+        "nature",
+        "birds",
+        "ambient",
+        "loop"
+      ],
       "author": "TinyWorlds",
       "license": "CC0",
       "attributionRequired": false,
@@ -89,7 +120,13 @@
       "name": "Loopable Dungeon Ambience",
       "contentKind": "ambience",
       "category": "ambience",
-      "tags": ["dungeon", "dark", "ambient", "loop", "cave"],
+      "tags": [
+        "dungeon",
+        "dark",
+        "ambient",
+        "loop",
+        "cave"
+      ],
       "author": "JaggedStone",
       "license": "CC0",
       "attributionRequired": false,
@@ -106,7 +143,12 @@
       "name": "Menu Music Loop",
       "contentKind": "music",
       "category": "music",
-      "tags": ["music", "menu", "loop", "background"],
+      "tags": [
+        "music",
+        "menu",
+        "loop",
+        "background"
+      ],
       "author": "qubodup",
       "license": "CC0",
       "attributionRequired": false,
@@ -122,7 +164,12 @@
       "name": "Level Music Loop",
       "contentKind": "music",
       "category": "music",
-      "tags": ["music", "level", "loop", "gameplay"],
+      "tags": [
+        "music",
+        "level",
+        "loop",
+        "gameplay"
+      ],
       "author": "qubodup",
       "license": "CC0",
       "attributionRequired": false,
@@ -132,6 +179,55 @@
       "fileName": "levelmusicloop-tigrun.ogg",
       "loop": true,
       "artType": "Music"
+    },
+    {
+      "id": "wolf-pack-32x32",
+      "name": "Wolf Pack! 32x32 Walking Wolf Animation",
+      "contentKind": "animation",
+      "category": "enemy-animation",
+      "tags": [
+        "wolf",
+        "beast",
+        "enemy",
+        "animated",
+        "animation",
+        "pixel-art",
+        "32x32",
+        "top-down"
+      ],
+      "author": "patvanmackelberg",
+      "license": "CC0",
+      "attributionRequired": false,
+      "sourceUrl": "https://opengameart.org/content/wolf-pack-32x32-walking-wolf-animation",
+      "previewUrl": "https://opengameart.org/sites/default/files/Wolfpack.png",
+      "downloadUrl": "https://opengameart.org/sites/default/files/Wolfpack.png",
+      "fileName": "Wolfpack.png",
+      "bytesHint": 11366,
+      "artType": "2D Art"
+    },
+    {
+      "id": "bandit-sprite-16x16",
+      "name": "Bandit Sprite [16x16]",
+      "contentKind": "sprite",
+      "category": "enemy-sprite",
+      "tags": [
+        "bandit",
+        "enemy",
+        "pixel-art",
+        "sprite",
+        "fantasy",
+        "roguelike",
+        "16x16"
+      ],
+      "author": "One Man Army",
+      "license": "CC0",
+      "attributionRequired": false,
+      "sourceUrl": "https://opengameart.org/content/bandit-sprite-16x16",
+      "previewUrl": "https://opengameart.org/sites/default/files/bandit.png",
+      "downloadUrl": "https://opengameart.org/sites/default/files/bandit.png",
+      "fileName": "bandit.png",
+      "bytesHint": 305,
+      "artType": "2D Art"
     }
   ]
 }
