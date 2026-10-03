@@ -70,7 +70,7 @@ jobs:
           sudo apt-get install -y pngcheck
           pngcheck -V || true
       - name: Restore deterministic asset optimization cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .cache/asset-space
           key: asset-space-strict-v2-${{ runner.os }}-${{ hashFiles('src/creators/assets/*.mjs', 'scripts/asset-*.mjs', 'assets/**/*.png', 'C/**/*.png') }}
@@ -127,7 +127,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.ASSET_NODE_VERSION }}
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .cache/asset-space
           key: asset-space-adaptive-v2-${{ runner.os }}-${{ hashFiles('src/creators/assets/*.mjs', 'scripts/asset-*.mjs', 'assets/**/*.png', 'C/**/*.png') }}
@@ -154,7 +154,7 @@ jobs:
         with:
           node-version: ${{ env.ASSET_NODE_VERSION }}
       - name: Restore compiled codec tools
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/bin/oxipng
