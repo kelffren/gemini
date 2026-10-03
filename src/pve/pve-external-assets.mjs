@@ -7,7 +7,7 @@ import {searchOpenGameArtAssets} from '../creators/assets/opengameart-live-provi
 import {rankAssets} from '../creators/assets/asset-quality-ranker.mjs';
 
 const F=Object.freeze;
-const QUERIES=F({beast:'wolf',bandit:'bandit'});
+const QUERIES=F({beast:'lpc wolf',bandit:'bandit'});
 export async function resolveGreenwildEnemyAsset(family,{limit=12}={}){
   const query=QUERIES[String(family)]||String(family||'enemy');
   const rows=await searchOpenGameArtAssets(query,{limit});

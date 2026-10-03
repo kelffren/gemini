@@ -1,7 +1,7 @@
 {
-  "version": 2,
+  "version": 3,
   "source": "OpenGameArt.org",
-  "policy": "Only assets whose OpenGameArt page, license and direct file URL were individually verified are exposed as downloadable.",
+  "policy": "Curated OpenGameArt assets whose source page, license and direct file URL were individually verified. Entries may be CC0 or attribution-compatible licenses allowed by Kelo policy; each row carries its own attribution requirements.",
   "assets": [
     {
       "id": "simple-character-base-16x16",
@@ -179,6 +179,46 @@
       "fileName": "levelmusicloop-tigrun.ogg",
       "loop": true,
       "artType": "Music"
+    },
+    {
+      "id": "lpc-wolf-animation-brown",
+      "name": "[LPC] Wolf Animation — Brown",
+      "contentKind": "animation",
+      "category": "enemy-animation",
+      "tags": [
+        "wolf",
+        "lpc",
+        "beast",
+        "enemy",
+        "animated",
+        "animation",
+        "pixel-art",
+        "top-down",
+        "rpg",
+        "fantasy",
+        "64x64",
+        "game-ready"
+      ],
+      "author": "Stephen \"Redshrike\" Challener / William.Thompsonj",
+      "license": "CC-BY-4.0",
+      "attributionRequired": true,
+      "attribution": "Graphic artist: Stephen \"Redshrike\" Challener; contributor/commissioner: William.Thompsonj. Source: OpenGameArt [LPC] Wolf Animation.",
+      "sourceUrl": "https://opengameart.org/content/lpc-wolf-animation",
+      "previewUrl": "https://opengameart.org/sites/default/files/wolfsheet3_0.png",
+      "downloadUrl": "https://opengameart.org/sites/default/files/wolfsheet3_0.png",
+      "fileName": "wolfsheet3_0.png",
+      "bytesHint": 88300,
+      "artType": "2D Art",
+      "verified": true,
+      "spriteProfile": {
+        "frameWidth": 64,
+        "frameHeight": 64,
+        "columns": 10,
+        "rows": 6,
+        "startColumn": 5,
+        "row": 0,
+        "frames": 5
+      }
     },
     {
       "id": "wolf-pack-32x32",

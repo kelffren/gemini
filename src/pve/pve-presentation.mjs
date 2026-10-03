@@ -9,7 +9,7 @@ const F=Object.freeze;const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 function loadImage(url){return new Promise(resolve=>{const I=globalThis.Image;if(!I||!url)return resolve(null);const img=new I();img.decoding='async';img.onload=()=>resolve(img);img.onerror=()=>resolve(null);img.src=url})}
 export async function createGreenwildSpriteBank(){
   const selected=await preloadGreenwildEnemyAssets(),bank={};
-  for(const family of ['beast','bandit']){const asset=selected?.[family]?.asset||null;bank[family]=F({asset,image:await loadImage(asset?.downloadUrl||asset?.previewUrl),frameSize:family==='beast'?32:16,frames:1})}
+  for(const family of ['beast','bandit']){const asset=selected?.[family]?.asset||null,profile=asset?.spriteProfile||null;bank[family]=F({asset,image:await loadImage(asset?.downloadUrl||asset?.previewUrl),frameWidth:Number(profile?.frameWidth)||(family==='beast'?32:16),frameHeight:Number(profile?.frameHeight)||(family==='beast'?32:16),columns:Number(profile?.columns)||0,row:Math.max(0,Number(profile?.row)||0),startColumn:Math.max(0,Number(profile?.startColumn)||0),frames:Math.max(1,Number(profile?.frames)||1)})}
   return F(bank);
 }
 export function createPvePresenter({ctx=globalThis.ctx,camera=globalThis.camera,spriteBank=null,now=()=>performance.now()}={}){
@@ -17,8 +17,8 @@ export function createPvePresenter({ctx=globalThis.ctx,camera=globalThis.camera,
   function body(enemy,p,r){
     const row=spriteBank?.[enemy.family]||spriteBank?.beast,img=row?.image;
     if(img?.naturalWidth&&img?.naturalHeight){
-      const fs=row.frameSize||32,frames=Math.max(1,Math.min(row.frames||1,Math.floor(img.naturalWidth/fs)||1)),frame=enemy.state==='chase'?Math.floor(now()/110)%frames:0;
-      const dw=Math.max(32,r*2.5),dh=dw;ctx.imageSmoothingEnabled=false;ctx.drawImage(img,frame*fs,0,fs,Math.min(fs,img.naturalHeight),p.x-dw/2,p.y-dh*.72,dw,dh);return true;
+      const fw=Math.max(1,row.frameWidth||32),fh=Math.max(1,row.frameHeight||fw),cols=Math.max(1,row.columns||Math.floor(img.naturalWidth/fw)||1),start=Math.min(cols-1,row.startColumn||0),available=Math.max(1,cols-start),frames=Math.max(1,Math.min(row.frames||1,available)),frame=enemy.state==='chase'?Math.floor(now()/110)%frames:0,sx=(start+frame)*fw,sy=Math.min(Math.max(0,row.row||0)*fh,Math.max(0,img.naturalHeight-fh));
+      const dw=Math.max(42,r*3.25),dh=dw*(fh/fw);ctx.imageSmoothingEnabled=false;ctx.drawImage(img,sx,sy,fw,Math.min(fh,img.naturalHeight-sy),p.x-dw/2,p.y-dh*.72,dw,dh);return true;
     }
     ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fill();return false;
   }

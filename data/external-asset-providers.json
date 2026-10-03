@@ -1,5 +1,5 @@
 {
-  "version": 15,
+  "version": 16,
   "policy": {
     "downloadOnBrowse": false,
     "requireExplicitDownload": true,
@@ -87,12 +87,12 @@
       "mode": "live-index",
       "enabled": true,
       "verified": true,
-      "license": "CC0 curated subset",
-      "attributionRequired": false,
+      "license": "CC0 / CC-BY / OGA-BY curated subset",
+      "attributionRequired": true,
       "sourceUrl": "https://opengameart.org/",
       "browseUrl": "https://opengameart.org/",
       "indexUrl": "../../../data/opengameart-cc0-curated.json?v=3",
-      "notes": "LIVE curated metadata for sprites, animations, tiles, SFX, music and ambience. Metadata is paged; inactive pages are hibernated and Kelo never bulk-scrapes binary content from player devices.",
+      "notes": "LIVE curated metadata for sprites, animations, tiles, SFX, music and ambience. Each asset carries its own verified license/attribution metadata. Metadata is paged; inactive pages are hibernated and Kelo never bulk-scrapes binary content from player devices.",
       "supportsRemotePreview": true,
       "supportsCORS": true,
       "supportsThumbnail": true,
