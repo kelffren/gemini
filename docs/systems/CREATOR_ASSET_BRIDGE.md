@@ -321,3 +321,16 @@ Current required creator gates include:
 - sourceRects/IDs/gameplay metadata do not depend on delivery codec;
 - Asset Forge remains the drawing/template owner and may feed SOURCE assets into this bridge; this compiler does not duplicate Asset Forge;
 - current Canvas runtime remains authoritative until a separately validated DELIVERY promotion changes it.
+
+
+## Library tilesets in World — grid contract
+
+`analyzeTilesetPixels(rgba,width,height,tileGrid)` is the regular-grid primitive of the existing Asset Sheet Compiler. `tileGrid` has integer `tileWidth`, `tileHeight` (1–512), `margin`, and `spacing` (0–128); the default is 32×32 with no border/gap. Full cells stay within the decoded image, fully transparent cells are skipped, and grids above 4096 cells fail explicitly. Opaque adjacent cells retain their complete source pixels; foreground/background heuristics apply only to irregular object sheets.
+
+Vault preserves `tileGrid` and emits the existing manifest with `grid.signature`. Frame IDs include grid configuration and row/column. Recompiling retains previous grid frames so saved placements can still resolve. The runtime bridge registers exact source rectangles, original cell size and pass-through collision through Atlas Contract and Property Catalog. No second tile renderer or catalog is created.
+
+World's Universal picker opens all kinds so Tiles is available. `startTilesetLibraryPlacement({root,session,asset})` in the existing Library Build Bridge shows grid controls and at most 48 tile buttons per page. An external selection downloads only on **Usar tileset**. Existing local imports reopen the same chooser. Choosing a cell requests `session.beginPlacement(templateId)` with the cell snap size; nothing is placed before that choice. The tile is an ordinary placeable stamp, not an auto-connected terrain material. Terrain topology still belongs to Terrain Contract.
+
+The live session exposes `refreshAssets()` and `setSnapSize(size)` to consumers, keeping catalog refresh and grid state inside its existing owner. Placement, undo/redo, draft saving and authority mirroring remain Studio commands. Vault binaries are local to this device; publishing/shared asset availability remains the existing review/server boundary. Closing World destroys the chooser. Errors (licensing, download, invalid grid) remain visible and retryable.
+
+Regression: `tests/world-library-tileset.spec.js` exercises picker handoff, 32×32 crop, touch placement, undo/redo, save and reopen. `npm run audit:asset-sheet` checks opaque cells, transparent cells, margin, spacing and invalid grids. The canonical stability gate also checks an eight-second iPhone movement walk. Physical Safari device verification remains pending until separately evidenced.

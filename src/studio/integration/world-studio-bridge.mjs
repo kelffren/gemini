@@ -11,7 +11,7 @@
 import { createBugObserver } from '../../core/bug-observability.mjs';
 import { yieldStudioBoot, setWorldLaunchStatus } from './studio-boot-pace.mjs';
 
-export const WORLD_STUDIO_BRIDGE_BUILD='studio-thaw-20260930';
+export const WORLD_STUDIO_BRIDGE_BUILD='studio-tileset-20261003';
 const bridgeUrl=new URL(import.meta.url);
 const incomingBuild=bridgeUrl.searchParams.get('v')||'';
 // Workspace can lag one or more static build tags behind this bridge. Do not let
@@ -112,7 +112,8 @@ export function sanitizeWorldStudioProvisionalShell(root=globalThis){
 
 export function pruneWorldStudioStyles(root=globalThis){
   const doc=root?.document;
-  const styles=Array.from(doc?.querySelectorAll?.('style[data-kelo-studio-ui="1"]')||[]);
+  const styles=Array.from(doc?.querySelectorAll?.('style[data-kelo-studio-ui="1"]')||[]).filter(style=>style.dataset?.keloStudioShellStyle==='1'||String(style.textContent||'').includes('#kelo-studio-live{'));
+  // Palette and other optional UI styles share the UI marker and must remain installed.
   if(styles.length<=1)return styles.length;
   const keep=styles[styles.length-1];
   for(const style of styles){

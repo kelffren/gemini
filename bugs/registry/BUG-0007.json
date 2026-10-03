@@ -1,0 +1,142 @@
+{
+  "schema_version": 2,
+  "id": "BUG-0007",
+  "title": "World cannot select and use an external Library tileset as separate tiles",
+  "status": "FIXED_PENDING_VERIFY",
+  "severity": "medium",
+  "area": [
+    "studio",
+    "creators",
+    "mobile",
+    "ui"
+  ],
+  "source": "player",
+  "discovered_at": "2026-10-03",
+  "reported_by": [
+    "player"
+  ],
+  "reports": [],
+  "environment": {
+    "game_build": "main@8f5ca320a60e0b4e5674cca7a58a1acef322b66b",
+    "device": "iPhone",
+    "os": "iOS",
+    "browser": "Safari",
+    "surface": "World Universal Library tileset picker"
+  },
+  "reproduction": [
+    "Open Creators → World → LIBRARY.",
+    "Select Tiles and choose a regular PNG tileset.",
+    "Try to choose one tile and place it in the world."
+  ],
+  "expected": "Choose a cell from the sheet, then place/save that exact tile.",
+  "actual": "World initially filters image; tilesets follow irregular object compilation and first-template/full-sheet preview, with no tile selector.",
+  "evidence": [
+    "Player report: quiero usar un tileset de biblioteca y no me deja",
+    "world:image picker filter; compileVisual always called analyzeAssetSheetPixels"
+  ],
+  "suspected_files": [
+    "src/creators/ui/universal-asset-picker.mjs",
+    "src/creators/assets/content-integration-router.mjs",
+    "src/studio/integration/library-build-bridge.mjs"
+  ],
+  "owner_hint": "Kelo Creator Asset Bridge + Library Build Bridge",
+  "claimed_by": null,
+  "claim_started_at": null,
+  "research": {
+    "status": "sufficient",
+    "summary": "Image-only entry and irregular object analysis cannot express a regular tile grid. Existing source-rectangle property templates can.",
+    "known_facts": [
+      {
+        "id": "F1",
+        "statement": "World picker initializes kind=image, excluding tileset.",
+        "evidence": [
+          "universal-asset-picker.mjs KIND_BY_WORKSPACE"
+        ]
+      },
+      {
+        "id": "F2",
+        "statement": "Tileset visual compilation uses foreground-object segmentation with no grid selection.",
+        "evidence": [
+          "content-integration-router.mjs compileVisual",
+          "external-live-preview-bridge.mjs chooseImportedTemplate"
+        ]
+      }
+    ],
+    "hypotheses": [],
+    "ruled_out": [],
+    "unknowns": [],
+    "external_references": [
+      {
+        "title": "Tiled editing tilesets",
+        "url": "https://docs.mapeditor.org/en/stable/manual/editing-tilesets/",
+        "lesson": "Regular cells require tile dimensions, margin and spacing."
+      }
+    ],
+    "last_researched_at": "2026-10-03T03:15:00Z"
+  },
+  "attempt_history": [
+    {
+      "id": "A1",
+      "at": "2026-10-03T03:15:00Z",
+      "actor": "Codex",
+      "goal": "Choose and place an exact tile through canonical Studio placement",
+      "hypothesis_ids": [],
+      "change": {
+        "status": "candidate",
+        "commits": [],
+        "files": [
+          "src/creators/ui/universal-asset-picker.mjs",
+          "src/creators/assets/content-integration-router.mjs",
+          "src/studio/integration/library-build-bridge.mjs"
+        ],
+        "summary": "Preserve regular grid cells and show paged cell picker before placement."
+      },
+      "validation": {
+        "environment": "local audit + exact PR CI",
+        "method": "asset-sheet audit, world-library-tileset.spec.js, main-stability-mobile.spec.js",
+        "result": "NOT_RUN",
+        "evidence": []
+      },
+      "conclusion": "Candidate awaits exact-build flow and physical Safari confirmation."
+    }
+  ],
+  "next_best_actions": [
+    {
+      "priority": 1,
+      "action": "Run exact PR tileset test, then inspect the same selection/placement on physical Safari.",
+      "reason": "Tile stamps must retain exact crop and persist through reopen.",
+      "expected_signal": "Selected cell places, saves and reopens; no full-sheet stamp.",
+      "stop_condition": "Missing crop, placement, persisted tile or frozen mobile UI."
+    }
+  ],
+  "fix": {
+    "status": "candidate",
+    "commits": [],
+    "files": [
+      "src/creators/ui/universal-asset-picker.mjs",
+      "src/creators/assets/content-integration-router.mjs",
+      "src/studio/integration/library-build-bridge.mjs"
+    ],
+    "summary": "Grid compilation, metadata preservation and bounded tile chooser under existing owners."
+  },
+  "verification": {
+    "status": "PENDING",
+    "method": "Exact PR mobile tileset and sustained walk; physical Safari pending.",
+    "evidence": [],
+    "verified_by": null,
+    "verified_at": null
+  },
+  "blocked_by": [],
+  "duplicate_of": null,
+  "related_bugs": [
+    "BUG-0006"
+  ],
+  "notes": [
+    "Tile stamps use existing placement; automatic terrain topology and server publication are separate existing contracts."
+  ],
+  "updated_at": "2026-10-03T03:15:00Z",
+  "regression": {
+    "test": "tests/world-library-tileset.spec.js",
+    "command": "npx playwright test tests/world-library-tileset.spec.js"
+  }
+}

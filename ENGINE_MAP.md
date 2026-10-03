@@ -93,6 +93,8 @@ Entradas principales:
 - `src/studio/ui/studio-live-shell.mjs`
 - `src/studio/ui/studio-asset-palette.mjs`
 
+Biblioteca de World conserva tilesets como cuadrículas exactas a través de Asset Sheet Compiler → Vault → Atlas/Property Catalog → Library Build Bridge → placement. El controlador LIVE posee `refreshAssets()` y `setSnapSize(size)`; el selector no muta el documento directamente.
+
 El shell es UI; no posee mutations del mundo. Las mutations pasan por Studio Kernel/commands y la autoridad existente. En móvil, el boot se fragmenta y cede turns para evitar matar Safari al parsear/montar el grafo completo.
 
 **Regla QA:** World en iPhone no se declara resuelto solo con headless. Requiere apertura, interacción, placement y reapertura en dispositivo real/LIVE.

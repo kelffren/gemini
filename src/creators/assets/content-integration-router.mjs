@@ -4,7 +4,7 @@
  * keys: CONTENT ROUTER IMAGE SPRITE TILESET ANIMATION VFX AUDIO SFX MUSIC AMBIENCE ABILITY SCENE PREFAB
  * purpose: Validate and compile downloaded personal content without executing external code.
  */
-import {analyzeAssetSheetPixels,buildAssetSheetManifest} from './asset-sheet-compiler.mjs';
+import {analyzeAssetSheetPixels,analyzeTilesetPixels,buildAssetSheetManifest} from './asset-sheet-compiler.mjs';
 
 export const CONTENT_KINDS=Object.freeze(['image','sprite','tileset','animation','vfx','sfx','music','ambience','ability','scene','prefab']);
 const IMAGE_KINDS=new Set(['image','sprite','tileset','animation','vfx']);
@@ -40,7 +40,7 @@ async function blobToCanvas(blob){
 async function compileVisual(asset,blob,kind){
   const canvas=await blobToCanvas(blob),ctx=canvas.getContext('2d',{willReadFrequently:true});
   let pixels;try{pixels=ctx.getImageData(0,0,canvas.width,canvas.height);}catch(error){throw new Error('CONTENT_PIXEL_READ_FAILED:'+(error?.message||error));}
-  const analysis=analyzeAssetSheetPixels(pixels.data,canvas.width,canvas.height,{});if(!analysis?.version||!Array.isArray(analysis.assets))throw new Error('CONTENT_COMPILER_REJECTED');
+  const analysis=kind==='tileset'?analyzeTilesetPixels(pixels.data,canvas.width,canvas.height,asset.tileGrid||{}):analyzeAssetSheetPixels(pixels.data,canvas.width,canvas.height,{});if(!analysis?.version||!Array.isArray(analysis.assets))throw new Error('CONTENT_COMPILER_REJECTED');
   const atlasId=`personal-${asset.provider}-${asset.externalId}`.toLowerCase().replace(/[^a-z0-9_-]+/g,'-');
   const manifest=buildAssetSheetManifest(analysis,{sourceName:asset.name,sourcePath:asset.sourceUrl||asset.downloadUrl,atlasId});
   manifest.contentKind=kind;

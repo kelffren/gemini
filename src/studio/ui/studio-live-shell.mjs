@@ -41,10 +41,11 @@ export function createStudioLiveShell({
   let root=document.getElementById('kelo-studio-live');
   if(root?.isConnected===false)root=null;
   const canReuse=!!reuse&&!!root?.querySelector?.('.ks-top')&&root.dataset?.shellVersion===SHELL_VERSION;
-  let style=canReuse?document.querySelector('style[data-kelo-studio-ui="1"]'):null;
+  let style=canReuse?Array.from(document.querySelectorAll('style[data-kelo-studio-ui="1"]')).find(node=>node.dataset.keloStudioShellStyle==='1'||node.textContent.includes('#kelo-studio-live{')):null;
   if(!style){
   style=document.createElement('style');
   style.dataset.keloStudioUi='1';
+  style.dataset.keloStudioShellStyle='1';
   style.textContent=`
   #kelo-studio-live{
     position:fixed;inset:0;z-index:2147483100;pointer-events:none;color:#edf4ef;

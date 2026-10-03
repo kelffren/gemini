@@ -11,6 +11,38 @@ import {compileWorldAssetPixels} from '../sprite-compiler/sprite-world-asset-com
 
 export const ASSET_SHEET_COMPILER_VERSION = 'kelo-asset-sheet-compiler-v1.1.0';
 
+// KELO-INDEX TILESET GRID: opaque adjacent tiles are cells, never foreground objects.
+export function analyzeTilesetPixels(rgba, width, height, grid = {}) {
+  const dimensions=assertPixels(rgba,width,height);
+  const field=(value,fallback,min,max)=>{
+    const n=Number(value??fallback);
+    if(!Number.isInteger(n)||n<min||n>max)throw new Error('TILESET_GRID_INVALID');
+    return n;
+  };
+  const tileWidth=field(grid.tileWidth,32,1,512),tileHeight=field(grid.tileHeight,tileWidth,1,512);
+  const margin=field(grid.margin,0,0,128),spacing=field(grid.spacing,0,0,128);
+  const columns=Math.floor((dimensions.width-2*margin+spacing)/(tileWidth+spacing));
+  const rows=Math.floor((dimensions.height-2*margin+spacing)/(tileHeight+spacing));
+  if(columns<1||rows<1)throw new Error('TILESET_GRID_DOES_NOT_FIT');
+  if(columns*rows>4096)throw new Error('TILESET_GRID_LIMIT:4096');
+  const signature=`${tileWidth}-${tileHeight}-${margin}-${spacing}`,assets=[];
+  for(let row=0;row<rows;row++)for(let col=0;col<columns;col++){
+    const x=margin+col*(tileWidth+spacing),y=margin+row*(tileHeight+spacing);
+    let visible=false;
+    for(let dy=0;dy<tileHeight&&!visible;dy++)for(let dx=0;dx<tileWidth;dx++)if(rgba[((y+dy)*dimensions.width+x+dx)*4+3]){visible=true;break;}
+    if(!visible)continue;
+    const frameId=`tile-${signature}-${row}-${col}`;
+    assets.push({id:frameId,assetId:frameId,frameId,label:`Tile ${col+1}, ${row+1}`,suggestedName:`Tile ${col+1}, ${row+1}`,
+      family:'tile',category:'tileset',layer:'props_back',gridSignature:signature,rowIndex:row,columnIndex:col,
+      sourceRect:{x,y,w:tileWidth,h:tileHeight},frameRect:{sx:x,sy:y,w:tileWidth,h:tileHeight},
+      visualBounds:{x:0,y:0,w:tileWidth,h:tileHeight},scale:{targetPixelWidth:tileWidth},collider:{mode:'none',passThrough:true}});
+  }
+  if(!assets.length)throw new Error('TILESET_EMPTY');
+  return {version:ASSET_SHEET_COMPILER_VERSION,...dimensions,grid:{tileWidth,tileHeight,margin,spacing,columns,rows,signature},
+    background:{mode:'unchanged'},contentRegion:{x:0,y:0,w:dimensions.width,h:dimensions.height},assets,
+    stats:{assetCount:assets.length,rowCount:rows}};
+}
+
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const integer = value => Math.max(0, Math.round(Number(value) || 0));
 const text = value => String(value == null ? '' : value).trim();
@@ -344,7 +376,7 @@ export function buildAssetSheetManifest(analysis, {sourceName='', sourcePath='',
     kind:'kelo-asset-sheet-manifest', version:'kelo-asset-sheet-manifest-v1', compiler:ASSET_SHEET_COMPILER_VERSION,
     source:{name:text(sourceName), path:text(sourcePath), width:analysis.width, height:analysis.height, background:analysis.background, contentRegion:analysis.contentRegion},
     atlas:{id:resolvedAtlasId, kind:'prop-atlas-irregular', frameMode:'irregular', width:analysis.width, height:analysis.height, sourcePath:text(sourcePath || sourceName), frames:Object.fromEntries(frames.map(frame => [frame.frameId, frame]))},
-    assets:frames, galleries, prefabs,
+    assets:frames, galleries, prefabs, ...(analysis.grid?{grid:{...analysis.grid}}:{}),
     importPolicy:{rectangles:'compiler-owned', semantics:'reviewable', anchor:'lower-support ground pivot', collider:'suggestion-only', placementOwner:'Map Forge / Property Catalog', bytesBoundary:'existing natural file bridge'}
   };
 }

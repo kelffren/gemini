@@ -1,4 +1,9 @@
-import {analyzeAssetSheetPixels, buildAssetSheetManifest} from '../src/creators/assets/asset-sheet-compiler.mjs';
+/* KELO-INDEX
+ * area: QA / CREATOR ASSET COMPILER
+ * keys: TILESET GRID OPAQUE ALPHA MARGIN SPACING BOUNDS PROP SEGMENTATION
+ * purpose: Validate exact cell geometry separately from irregular object segmentation.
+ */
+import {analyzeAssetSheetPixels, analyzeTilesetPixels, buildAssetSheetManifest} from '../src/creators/assets/asset-sheet-compiler.mjs';
 import {applyAssetReviewPacket, createAssetReviewPacket, createChatGPTReviewPrompt, buildReviewedAssetManifest} from '../src/creators/assets/kelo-creator-asset-bridge.mjs';
 import {createAssetSheetWorkspaceManifest} from '../src/creators/workspaces/asset-sheet-workspace.mjs';
 import {createCatalogPreviewDefinitions, installAssetSheetCatalogPreview} from '../src/creators/assets/asset-sheet-catalog-preview-adapter.mjs';
@@ -159,3 +164,19 @@ console.log(JSON.stringify({
   assets:analysis.assets.length, families:[...new Set(analysis.assets.map(asset => asset.family))],
   galleries:manifest.galleries.length, prefabs:manifest.prefabs.length, reviewed:first.assetId, realAsset
 }));
+
+// Opaque cells must keep all their pixels instead of becoming connected objects.
+const tiled=pixels(70,70,[255,20,30,255]);
+rect(tiled,70,36,36,32,32,[0,0,0,0]);
+const tiledAnalysis=analyzeTilesetPixels(tiled,70,70,{tileWidth:32,tileHeight:32,margin:2,spacing:2});
+assert(tiledAnalysis.assets.length===3,'skip only fully transparent cells');
+assert(JSON.stringify(tiledAnalysis.assets[1].sourceRect)===JSON.stringify({x:36,y:2,w:32,h:32}),'margin/spacing source bounds');
+assert(tiledAnalysis.assets.every(a=>a.collider.passThrough&&a.scale.targetPixelWidth===32),'tiles preserve dimensions and do not infer collision');
+const grid16=analyzeTilesetPixels(pixels(64,64),64,64,{tileWidth:16,tileHeight:16});
+assert(grid16.assets.length===16,'16px grid yields separate cells');
+assert(grid16.assets[0].frameId!==analyzeTilesetPixels(pixels(64,64),64,64).assets[0].frameId,'grid changes preserve distinct frame identities');
+for(const grid of [{tileWidth:0},{tileWidth:100},{tileWidth:1.5}]){
+ let rejected=false;try{analyzeTilesetPixels(pixels(64,64),64,64,grid);}catch{rejected=true;}
+ assert(rejected,'invalid/out of bounds grid fails explicitly');
+}
+console.log('TILESET_GRID_AUDIT_OK');
