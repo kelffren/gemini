@@ -228,6 +228,61 @@
       "fileName": "bandit.png",
       "bytesHint": 305,
       "artType": "2D Art"
+    },
+    {
+      "id": "dog-medium-60x38",
+      "name": "Dog - 6 animations",
+      "contentKind": "animation",
+      "category": "animal-animation",
+      "tags": [
+        "dog",
+        "animal",
+        "pixel-art",
+        "sprite-sheet",
+        "animation",
+        "walk",
+        "run",
+        "60x38"
+      ],
+      "author": "rmazanek",
+      "license": "CC0",
+      "attributionRequired": false,
+      "sourceUrl": "https://opengameart.org/content/dog-3",
+      "previewUrl": "https://opengameart.org/sites/default/files/dog_medium.png",
+      "downloadUrl": "https://opengameart.org/sites/default/files/dog_medium.png",
+      "fileName": "dog_medium.png",
+      "bytesHint": 8806,
+      "artType": "2D Art",
+      "spriteProfile": {
+        "frameWidth": 60,
+        "frameHeight": 38,
+        "columns": 6,
+        "rows": 6
+      }
+    },
+    {
+      "id": "bear-32x32",
+      "name": "Bears 32x32",
+      "contentKind": "animation",
+      "category": "animal-animation",
+      "tags": [
+        "bear",
+        "animal",
+        "pixel-art",
+        "sprite-sheet",
+        "animation",
+        "32x32",
+        "top-down"
+      ],
+      "author": "bleutailfly",
+      "license": "CC0",
+      "attributionRequired": false,
+      "sourceUrl": "https://opengameart.org/content/bears",
+      "previewUrl": "https://opengameart.org/sites/default/files/bear.png",
+      "downloadUrl": "https://opengameart.org/sites/default/files/bear.png",
+      "fileName": "bear.png",
+      "bytesHint": 13517,
+      "artType": "2D Art"
     }
   ]
 }
