@@ -26,7 +26,7 @@ jobs:
       - run: python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/kelo-http.log 2>&1 &
       - run: KELO_PAGES=http://127.0.0.1:4173/ npx playwright test tests/external-library-world-tree.spec.js --project=chromium
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: external-library-world-tree-evidence
           path: test-results/
