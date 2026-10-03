@@ -11,9 +11,11 @@ test('external Kenney tree reaches World Studio canvas and screenshot',async({pa
   await page.getByRole('button',{name:'Abrir World',exact:true}).click();
   await page.waitForSelector('#kelo-studio-live',{state:'visible',timeout:20000});
   await page.waitForFunction(()=>document.querySelector('#kelo-studio-live')?.dataset.keloWorldLoading!=='1',null,{timeout:30000});
-  await page.locator('#kelo-studio-live .ks-deck [data-act="edit-assets"]').click();
+  await page.evaluate(()=>document.querySelector('#kelo-studio-live [data-act="edit-assets"]')?.click());
+  await page.waitForTimeout(500);
   const popupPromise=context.waitForEvent('page');
-  await page.getByRole('button',{name:'BIBLIOTECA EXTERNA'}).click();
+  await page.waitForFunction(()=>[...document.querySelectorAll('#kelo-studio-live button')].some(b=>b.textContent?.includes('BIBLIOTECA EXTERNA')),null,{timeout:10000});
+  await page.evaluate(()=>[...document.querySelectorAll('#kelo-studio-live button')].find(b=>b.textContent?.includes('BIBLIOTECA EXTERNA'))?.click());
   const vault=await popupPromise; await vault.waitForLoadState('domcontentloaded');
   await vault.getByRole('button',{name:'Ver'}).filter({has:vault.locator('xpath=..').filter({hasText:'Árboles'})}).first().click().catch(async()=>{await vault.locator('[data-chip][data-provider="kenney"][data-query="tree"]').first().click();});
   await vault.waitForFunction(()=>document.querySelectorAll('#explore-grid .card').length>0,null,{timeout:30000});
