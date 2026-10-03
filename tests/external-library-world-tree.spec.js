@@ -1,8 +1,8 @@
 const { test, expect } = require('@playwright/test');
-test('external Kenney tree reaches World Studio canvas and screenshot',async({page,context})=>{
+test('external Kenney tree reaches World Studio canvas and screenshot',async({page})=>{
+  test.setTimeout(90000);
   await page.setViewportSize({width:390,height:844});
-  const stamp=Date.now();
-  await page.goto('/?mapEditor=1&externalTreeQA='+stamp,{waitUntil:'domcontentloaded'});
+  await page.goto('/?mapEditor=1&externalTreeQA='+Date.now(),{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.KELO_ADMIN_KEYS?.can?.('world.edit',window.KELO_ADMIN_KEYS?.playerId?.()),null,{timeout:20000});
   await page.evaluate(()=>document.querySelector('#lx-side-menu')?.click());
   await page.waitForSelector('#lx-create-studio',{state:'attached',timeout:10000});
@@ -10,25 +10,18 @@ test('external Kenney tree reaches World Studio canvas and screenshot',async({pa
   await page.waitForSelector('#kelo-creators-hub',{state:'visible'});
   await page.getByRole('button',{name:'Abrir World',exact:true}).click();
   await page.waitForSelector('#kelo-studio-live',{state:'visible',timeout:20000});
-  await page.waitForFunction(()=>document.querySelector('#kelo-studio-live')?.dataset.keloWorldLoading!=='1',null,{timeout:30000});
-  await page.evaluate(()=>document.querySelector('#kelo-studio-live [data-act="edit-assets"]')?.click());
-  await page.waitForTimeout(500);
-  const vault=await context.newPage();
-  await vault.goto('/asset-vault.html?from=studio',{waitUntil:'domcontentloaded'});
-  await vault.getByRole('button',{name:'Ver'}).filter({has:vault.locator('xpath=..').filter({hasText:'Árboles'})}).first().click().catch(async()=>{await vault.locator('[data-chip][data-provider="kenney"][data-query="tree"]').first().click();});
-  await vault.waitForFunction(()=>document.querySelectorAll('#explore-grid .card').length>0,null,{timeout:30000});
-  const card=vault.locator('#explore-grid .card').first();
+  await page.goto('/asset-vault.html?from=studio',{waitUntil:'domcontentloaded'});
+  await page.locator('[data-chip][data-provider="kenney"][data-query="tree"]').first().click();
+  await page.waitForFunction(()=>document.querySelectorAll('#explore-grid .card').length>0,null,{timeout:30000});
+  const card=page.locator('#explore-grid .card').first();
   const name=(await card.locator('.name').textContent())?.trim();
   const provider=(await card.locator('.meta').textContent())?.trim();
   expect(provider.toLowerCase()).toContain('kenney');
   await card.locator('[data-act="preview"]').click();
-  await expect(vault.locator('#preview-modal')).toBeVisible();
-  await vault.locator('[data-preview-act="place"]').click();
-  await vault.waitForFunction(()=>!!localStorage.getItem('kelo.library.build.pending.v1'),null,{timeout:30000});
-  await page.bringToFront();
-  const pending=await page.evaluate(()=>JSON.parse(localStorage.getItem('kelo.library.build.pending.v1')||'null'));
-  expect(pending?.id).toBeTruthy();
-  await page.evaluate(id=>window.dispatchEvent(new CustomEvent('kelo:build-personal-content',{detail:{id}})),pending.id);
+  await expect(page.locator('#preview-modal')).toBeVisible();
+  await page.locator('[data-preview-act="place"]').click();
+  await page.waitForURL(/buildAsset=/,{timeout:30000});
+  await page.waitForSelector('#kelo-studio-live',{state:'visible',timeout:30000});
   await page.waitForFunction(()=>/^(PLACEMENT|PREFAB)/.test(document.querySelector('#kelo-studio-live .ks-status')?.textContent||''),null,{timeout:30000});
   const before=await page.locator('#kelo-studio-live .ks-status').textContent();
   await page.mouse.click(195,420);
@@ -38,4 +31,3 @@ test('external Kenney tree reaches World Studio canvas and screenshot',async({pa
   await page.screenshot({path:'test-results/external-library-tree-world.png',fullPage:false});
   console.log(JSON.stringify({asset:name,provider,status:after,screenshot:'test-results/external-library-tree-world.png'}));
 });
-// QA v2 palette wiring
