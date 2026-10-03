@@ -15,6 +15,6 @@ jobs:
       - run: |
           python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/server.log 2>&1 &
           npx playwright test tests/pve-wolf-visual-proof.spec.js --project=chromium
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with: {name: perfect-external-animal-proof, path: test-results/pve-wolf-proof.png}
