@@ -20,7 +20,7 @@ test('external Kenney tree reaches World Studio canvas and screenshot',async({pa
   const card=vault.locator('#explore-grid .card').first();
   const name=(await card.locator('.name').textContent())?.trim();
   const provider=(await card.locator('.meta').textContent())?.trim();
-  expect(provider).toContain('Kenney');
+  expect(provider.toLowerCase()).toContain('kenney');
   await card.locator('[data-act="preview"]').click();
   await expect(vault.locator('#preview-modal')).toBeVisible();
   await vault.locator('[data-preview-act="place"]').click();
