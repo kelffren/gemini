@@ -33,3 +33,4 @@ test('external Kenney tree reaches World Studio canvas and screenshot',async({pa
   await page.screenshot({path:'test-results/external-library-tree-world.png',fullPage:false});
   console.log(JSON.stringify({asset:name,provider,status:after,screenshot:'test-results/external-library-tree-world.png'}));
 });
+// QA trigger: external tree visual proof
