@@ -26,17 +26,15 @@
     },
     {
       "systemId": "persistent-world-state",
-      "status": "foundation-active",
-      "owners": ["src/mmorpg/wave1-root-systems.mjs", "Supabase Online Foundation"],
-      "evidence": ["revision CAS primitive", "reconstruction primitive", "map version persistence exists"],
-      "missingForIntegrated": ["durable live world mutation store distinct from immutable authored map versions"]
+      "status": "integrated",
+      "owners": ["server/world-state-store.js", "server/server-state-bridge.js", "supabase/functions/kelo-server-state/index.ts", "public.world_cell_snapshots"],
+      "evidence": ["durable per-cell snapshot", "revision CAS", "server-only mutation boundary", "production migration 20260917060152", "production hardening 20260917060425", "runtime composition in server/sprite-ai-bootstrap.js", "memory fallback explicitly non-durable"]
     },
     {
       "systemId": "world-event-ledger",
-      "status": "foundation-active",
-      "owners": ["src/mmorpg/wave1-root-systems.mjs", "Supabase server_audit_events/server_idempotency/server_outbox"],
-      "evidence": ["append/idempotency/replay primitive", "server audit/idempotency/outbox tables exist"],
-      "missingForIntegrated": ["world mutation event schema and trusted-server append path"]
+      "status": "integrated",
+      "owners": ["public.world_event_ledger", "public.world_apply_mutation", "public.world_replay_events", "server/server-state-bridge.js", "supabase/functions/kelo-server-state/index.ts"],
+      "evidence": ["append-only event rows", "unique event IDs", "one event per cell revision", "server_idempotency integration", "server_audit_events integration", "server_outbox integration", "replay by cell/revision", "trusted-server RPC only"]
     },
     {
       "systemId": "creator-identity-reputation",
