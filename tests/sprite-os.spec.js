@@ -5,6 +5,8 @@
  * purpose: Exercise the external-only Sprite OS controls and prove adjusted try-on state reaches the original game runtime.
  */
 const { test, expect } = require('@playwright/test');
+const fs=require('node:fs');
+const path=require('node:path');
 
 const PREVIEW_KEY='kelo.universal.look.preview.v1';
 const RUNTIME_KEY='kelo.universal.look.runtime.v1';
@@ -21,9 +23,13 @@ async function mockExternalSpriteCatalog(page){
       indexUrl:'https://sprite.test/index.json',assetBaseUrl:`${origin}/`,sourceUrl:'https://sprite.test/source'
     }]})});
   });
+  // Distinct source filenames keep paging fixtures distinct under AssetQualityRanker deduplication.
+  await page.route('**/assets/sprite-os-fixtures/archer-*.png',async route=>{
+    await route.fulfill({contentType:'image/png',body:fs.readFileSync(path.join(__dirname,'../assets/kelo-hero-body-base-8dir.png'))});
+  });
   await page.route('https://sprite.test/index.json',async route=>{
     const examples=Array.from({length:50},(_,i)=>({
-      slug:`archer-${i}`,title:`Dark Archer ${i}`,category:'character',previewPath:'assets/kelo-hero-body-base-8dir.png',
+      slug:`archer-${i}`,title:`Dark Archer ${i}`,category:'character',previewPath:`assets/sprite-os-fixtures/archer-${i}.png`,
       sourceUrl:`https://sprite.test/assets/${i}`,prompt:'dark archer pixel character eight direction',settings:[]
     }));
     await route.fulfill({contentType:'application/json',body:JSON.stringify({examples})});
