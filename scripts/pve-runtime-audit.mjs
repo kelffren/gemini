@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {createSpawnPlan,createEnemyActor,createEncounterRuntime} from '../src/pve/pve-runtime.mjs';
+const plan=createSpawnPlan({encounterId:'greenwild-test',count:6,seed:'fixed',eliteChance:.5,championChance:.1});
+assert.equal(plan.length,6);assert.deepEqual(plan,createSpawnPlan({encounterId:'greenwild-test',count:6,seed:'fixed',eliteChance:.5,championChance:.1}));
+const enemy=createEnemyActor({...plan[0],x:0,y:0,telegraphMs:100,recoveryMs:100},{attackRange:60,aggroRange:300,lootTable:[{id:'hide',guaranteed:true}]});
+enemy.update(16,{target:{id:'p',x:20,y:0}});assert.equal(enemy.snapshot.state,'telegraph');
+enemy.update(100,{target:{id:'p',x:20,y:0}});assert.equal(enemy.snapshot.state,'attack');
+enemy.update(16,{target:{id:'p',x:20,y:0}});assert.equal(enemy.snapshot.state,'recovery');
+const death=enemy.damage(999,{sourceId:'p',seed:'fixed'});assert.equal(death.dead,true);assert.equal(death.drops[0].id,'hide');
+const runtime=createEncounterRuntime(plan,{lootTable:[{id:'token',guaranteed:true}]});for(const row of plan)runtime.damage(row.spawnId,9999,{seed:'x'});assert.equal(runtime.cleared,true);
+console.log('pve-runtime-audit: ok');
