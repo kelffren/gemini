@@ -1,0 +1,20 @@
+name: Perfect External Animal Visual Proof
+on:
+  pull_request:
+    paths: ['src/pve/**','assets/external/**','data/opengameart-cc0-curated.json','.github/workflows/perfect-external-animal-proof.yml']
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '24.20.0', cache: npm}
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/server.log 2>&1 &
+          npx playwright test tests/pve-wolf-visual-proof.spec.js --project=chromium
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: perfect-external-animal-proof, path: test-results/pve-wolf-proof.png}
