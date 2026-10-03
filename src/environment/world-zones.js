@@ -21,7 +21,6 @@ function drawPortal(g,p,label){
   g.beginPath();g.arc(0,0,p.r*.62,0,Math.PI*2);g.stroke();
   g.fillStyle='rgba(4,14,20,.82)';g.fillRect(-66,p.r+10,132,30);
   g.fillStyle='#fff';g.font='bold 15px sans-serif';g.textAlign='center';g.fillText(label,0,p.r+31);
-  drawPortal(g,MAP2_PORTAL,MAP2_PORTAL.label);
   g.restore();
 }
 function drawPlazaPortal(g){if(active==='plaza')drawPortal(g,PLAZA_PORTAL,PLAZA_PORTAL.label);}
@@ -43,6 +42,7 @@ function drawTown(g){
   g.strokeStyle='#6c5b45';g.lineWidth=3;g.strokeRect(r.x,r.y,r.w,r.h);
   g.fillStyle='rgba(10,18,14,.78)';g.fillRect(r.x+20,r.y+18,260,44);
   g.fillStyle='#fff';g.font='bold 22px sans-serif';g.fillText('MAPA 2 · SKETCH TOWN',r.x+34,r.y+48);
+  drawPortal(g,MAP2_PORTAL,MAP2_PORTAL.label);
   g.restore();
 }
 layers.register({id:'kelo-map2-sketch-town-proof',phase:'paths_floors',priority:90,required:false,ownership:'KELO_WORLD_ZONES',draw:drawTown,bounds:[{id:'map2',x:MAP2.x,y:MAP2.y,w:MAP2.w,h:MAP2.h}]});
