@@ -13,6 +13,7 @@ test('Approval stays above Library when collapsed, expanded and rotated',async({
   await page.goto(new URL('./__kelo_world_approval_layout_fixture__',process.env.KELO_PAGES||'http://127.0.0.1:4173/').href);
   await page.evaluate(async()=>{
     // Exercise real UI owners independently of gameplay/auth/network latency.
+    document.head.innerHTML='<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">';
     document.body.innerHTML='';
     const {createStudioLiveShell}=await import('./src/studio/ui/studio-live-shell.mjs');
     const {createStudioAssetPalette}=await import('./src/studio/ui/studio-asset-palette.mjs');
