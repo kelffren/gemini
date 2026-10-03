@@ -29,8 +29,8 @@ test('World uses a chosen Library tile and retains it after save and reopen',asy
   expect(new URL(await page.evaluate(()=>window.__tilesetPickerURL)).searchParams.get('kind')).toBe('all');
   await page.evaluate(()=>window.postMessage({type:'kelo:asset-picker-selected',context:'world',asset:{
     id:'qa:grass-tiles',name:'QA Grass tiles',provider:'kelo',externalId:'qa-grass-tiles',contentKind:'tileset',license:'KELO-NATIVE',
-    previewUrl:new URL('./assets/grass-variation-v1.png',location.href).href,
-    downloadUrl:new URL('./assets/grass-variation-v1.png',location.href).href
+    previewUrl:new URL('./assets/world/plaza/forest-plaza-tileset.png',location.href).href,
+    downloadUrl:new URL('./assets/world/plaza/forest-plaza-tileset.png',location.href).href
   }},location.origin));
   const picker=page.locator('#kelo-tileset-picker');await expect(picker).toBeVisible();
   expect(await page.evaluate(()=>window.__tilesetQA.studio.tools.placement.getPreview())).toBeNull();
@@ -38,8 +38,9 @@ test('World uses a chosen Library tile and retains it after save and reopen',asy
   console.log('TILESET_QA_LAYOUT',await picker.evaluate(e=>({panel:e.getBoundingClientRect().toJSON(),button:e.querySelector('[data-tileset-prepare]').getBoundingClientRect().toJSON(),height:innerHeight,header:document.querySelector('#kelo-studio-live .ks-top')?.getBoundingClientRect().toJSON()})));
   await expect(picker.locator('[data-tileset-prepare]')).toBeInViewport();
   await picker.locator('[data-tileset-prepare]').click({timeout:10000});
-  await expect(picker.locator('[data-tile-template]')).toHaveCount(8,{timeout:15000});
+  await expect(picker.locator('[data-tile-template]')).toHaveCount(48,{timeout:15000});
   console.log('TILESET_QA_CELLS_READY');
+  await expect(page.locator('#kelo-studio-live')).toHaveCSS('position','fixed');
   const chosen=picker.locator('[data-tile-template]').nth(1),templateId=await chosen.getAttribute('data-tile-template');
   await chosen.click({timeout:10000});
   const ghost=await page.evaluate(()=>window.__tilesetQA.studio.tools.placement.getPreview());
