@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "source": "OpenGameArt.org",
   "policy": "Curated OpenGameArt assets whose source page, license and direct file URL were individually verified. Entries may be CC0 or attribution-compatible licenses allowed by Kelo policy; each row carries its own attribution requirements.",
   "assets": [
@@ -204,9 +204,9 @@
       "attributionRequired": true,
       "attribution": "Graphic artist: Stephen \"Redshrike\" Challener; contributor/commissioner: William.Thompsonj. Source: OpenGameArt [LPC] Wolf Animation.",
       "sourceUrl": "https://opengameart.org/content/lpc-wolf-animation",
-      "previewUrl": "https://opengameart.org/sites/default/files/wolfsheet3_0.png",
-      "downloadUrl": "https://opengameart.org/sites/default/files/wolfsheet3_0.png",
-      "fileName": "wolfsheet3_0.png",
+      "previewUrl": "https://opengameart.org/sites/default/files/wolfsheet3.png",
+      "downloadUrl": "https://opengameart.org/sites/default/files/wolfsheet3.png",
+      "fileName": "wolfsheet3.png",
       "bytesHint": 88300,
       "artType": "2D Art",
       "verified": true,
@@ -215,9 +215,37 @@
         "frameHeight": 64,
         "columns": 10,
         "rows": 6,
-        "startColumn": 5,
-        "row": 0,
-        "frames": 5
+        "animations": {
+          "walk": {
+            "row": 0,
+            "startColumn": 5,
+            "frames": 4
+          },
+          "chase": {
+            "row": 0,
+            "startColumn": 5,
+            "frames": 4
+          },
+          "attack": {
+            "row": 2,
+            "startColumn": 5,
+            "frames": 5
+          },
+          "hurt": {
+            "row": 3,
+            "startColumn": 5,
+            "frames": 3
+          },
+          "death": {
+            "row": 4,
+            "startColumn": 5,
+            "frames": 5
+          }
+        },
+        "defaultAnimation": "walk",
+        "anchorX": 0.5,
+        "anchorY": 0.78,
+        "renderScale": 0.82
       }
     },
     {
