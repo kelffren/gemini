@@ -8,6 +8,9 @@ const { test, expect } = require('@playwright/test');
 const fs=require('node:fs');
 const path=require('node:path');
 
+// Request interception must own these mock images after navigation into the game.
+test.use({serviceWorkers:'block'});
+
 const PREVIEW_KEY='kelo.universal.look.preview.v1';
 const RUNTIME_KEY='kelo.universal.look.runtime.v1';
 
