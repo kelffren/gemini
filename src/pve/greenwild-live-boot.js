@@ -4,8 +4,8 @@
  */
 (async function(root){
  if(root.__KELO_GREENWILD_LIVE__)return;
- const [{ensurePveLiveDependencies},{createGreenwildRun},{mountPveWorld},{mountGreenwildPresentation},{deliver},{mount:mountPlayerCombat},{mount:mountAbilityCombat}]=await Promise.all([
-  import('./pve-live-dependencies.mjs'),import('./greenwild-vertical-slice.mjs'),import('./pve-world-integration.mjs'),import('./pve-presentation.mjs'),import('./pve-loot-delivery.mjs'),import('./pve-player-combat-adapter.mjs'),import('./pve-ability-combat-bridge.mjs')
+ const [{ensurePveLiveDependencies},{createGreenwildRun},{mountPveWorld},{mountGreenwildPresentation},{deliver},{mount:mountPlayerCombat},{mount:mountAbilityCombat},{mount:mountOliveOil}]=await Promise.all([
+  import('./pve-live-dependencies.mjs'),import('./greenwild-vertical-slice.mjs'),import('./pve-world-integration.mjs'),import('./pve-presentation.mjs'),import('./pve-loot-delivery.mjs'),import('./pve-player-combat-adapter.mjs'),import('./pve-ability-combat-bridge.mjs'),import('./olive-oil-live.mjs')
  ]);
  await ensurePveLiveDependencies();
  if(root.KeloAbilitiesLoader?.ensure)await root.KeloAbilitiesLoader.ensure();
@@ -21,6 +21,7 @@
  }
  const wolves=await mountEncounter('wolf-pack',150,-70,'wolf_basic'),bandits=await mountEncounter('bandit-road',360,80,'bandit_basic');
  let abilityCombat=null;try{abilityCombat=mountAbilityCombat({encounters:[wolves,bandits],getPlayer:()=>typeof localPlayer!=='undefined'?localPlayer:null});}catch(error){console.warn('[KeloPvE] ability bridge pending',error);}
- root.__KELO_GREENWILD_LIVE__=Object.freeze({run,wolves,bandits,abilityCombat,encounter:wolves.encounter,world:wolves.world,presentation:wolves.presentation,playerHit:wolves.world.playerHit});
- root.KeloEvents?.emit?.('kelo:pve:greenwild-live',{encounters:['wolf-pack','bandit-road'],canonical:true,inventory:true,playerCombat:true,abilityCombat:!!abilityCombat});
+ const oliveOil=mountOliveOil({getPlayer:()=>typeof localPlayer!=='undefined'?localPlayer:null});
+ root.__KELO_GREENWILD_LIVE__=Object.freeze({run,wolves,bandits,abilityCombat,oliveOil,encounter:wolves.encounter,world:wolves.world,presentation:wolves.presentation,playerHit:wolves.world.playerHit});
+ root.KeloEvents?.emit?.('kelo:pve:greenwild-live',{encounters:['wolf-pack','bandit-road'],canonical:true,inventory:true,playerCombat:true,abilityCombat:!!abilityCombat,oliveOil:true});
 })(globalThis).catch(error=>console.error('[KeloPvE] Greenwild live mount failed',error));
