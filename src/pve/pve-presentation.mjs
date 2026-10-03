@@ -9,7 +9,7 @@ const F=Object.freeze;const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 function loadImage(url){return new Promise(resolve=>{const I=globalThis.Image;if(!I||!url)return resolve(null);const img=new I();img.decoding='async';img.onload=()=>resolve(img);img.onerror=()=>resolve(null);img.src=url})}
 export async function createGreenwildSpriteBank(){
   const selected=await preloadGreenwildEnemyAssets(),bank={};
-  for(const family of ['beast','bandit']){const asset=selected?.[family]?.asset||null;bank[family]=F({asset,image:await loadImage(asset?.downloadUrl||asset?.previewUrl),frameSize:family==='beast'?32:16,frames:1})}
+  for(const family of ['beast','bandit']){const asset=selected?.[family]?.asset||null;const normalized=selected?.[family]?.normalized||null;const runtimeUrl=normalized?.runtimeUrl||(family==='beast'&&/wolf-pack-32x32$/.test(String(asset?.id||''))?'assets/external/wolf-pack-32x32-normalized.png':null);bank[family]=F({asset,normalized,runtimeUrl,image:await loadImage(runtimeUrl||asset?.downloadUrl||asset?.previewUrl),frameSize:Number(normalized?.render?.frameWidth)||(family==='beast'?32:16),frames:Number(normalized?.render?.columns)||1})}
   return F(bank);
 }
 export function createPvePresenter({ctx=globalThis.ctx,camera=globalThis.camera,spriteBank=null,now=()=>performance.now()}={}){
