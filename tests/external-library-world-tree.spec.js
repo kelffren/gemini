@@ -24,6 +24,7 @@ test('external Kenney tree reaches World Studio canvas and screenshot',async({pa
   await card.locator('[data-act="preview"]').click();
   await expect(vault.locator('#preview-modal')).toBeVisible();
   await vault.locator('[data-preview-act="place"]').click();
+  await vault.waitForFunction(()=>!!localStorage.getItem('kelo.library.build.pending.v1'),null,{timeout:30000});
   await page.bringToFront();
   const pending=await page.evaluate(()=>JSON.parse(localStorage.getItem('kelo.library.build.pending.v1')||'null'));
   expect(pending?.id).toBeTruthy();
