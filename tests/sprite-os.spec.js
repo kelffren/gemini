@@ -13,6 +13,9 @@ const RUNTIME_KEY='kelo.universal.look.runtime.v1';
 
 async function mockExternalSpriteCatalog(page){
   await page.addInitScript(()=>{
+    // This renderer test uses the supported local guest flow, independent of account auth.
+    sessionStorage.setItem('kelo_local_guest_play_v1','1');
+    localStorage.setItem('kelo_local_guest_play_v1','1');
     window.__spriteOsOpened=[];
     window.open=(url)=>{window.__spriteOsOpened.push(String(url));return null;};
   });
