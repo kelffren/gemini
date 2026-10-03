@@ -18,6 +18,7 @@
     'src/abilities/ability-balance-hot-owner.js?v=1',
     'src/systems/equipment-market-hot-owner.js?v=1',
     'src/systems/player-forging-system.js?v=1',
+    'src/systems/artisan-profession-system.js?v=1',
     'src/systems/arena-progression-hot-owner.js?v=1',
     'src/systems/liveops-world-content-hot-owner.js?v=1',
     'src/systems/liveops-interaction-runtime.js?v=1',
