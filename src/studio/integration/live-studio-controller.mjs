@@ -100,11 +100,6 @@ function paintStubChrome(root,createStudioLiveShell){
       try{root.KELO_WORLD_LAUNCH_ABORTED=true;}catch{}
       try{closeKeloStudioLive({root});}catch{}
       try{root.document.getElementById('kelo-studio-live')?.remove();}catch{}
-      try{
-      const {createStudioAssetPalette}=await import('../ui/studio-asset-palette.mjs?v=external-library-live-1');
-      assetPalette=createStudioAssetPalette({root,getAssets:()=>allAssets(),onSelect:id=>beginPlacement(id),renderAssetPreview:(canvas,asset)=>studio.assetPreview.renderThumbnail(canvas,asset)});
-      assetPalette.attach();
-    }catch(error){console.warn('[Kelo Studio] asset palette unavailable',error);}
     try{root.document.getElementById('kelo-world-launch-curtain')?.remove();}catch{}
       try{root.document.body.classList.remove('kelo-studio-active');}catch{}
     },
@@ -322,6 +317,14 @@ export async function openKeloStudioLive({root=globalThis}={}){
     detachPointer=attachStudioPointerInput({element:root.document,router:studio.kernel.input,toWorld:(x,y)=>cameraController.toWorld(x,y),capture:true,stopPropagation:true,shouldHandle:e=>running&&!playing&&!isStudioUi(e)});
     const phoneShell=isPhone(root);
     shell=createStudioLiveShell({host:root.document.body,reuse:phoneShell&&!!root.document.getElementById('kelo-studio-live')?.querySelector?.('.ks-top'),assets:phoneShell?phoneSeedAssets(allAssets()):allAssets(),onMode:setMode,onAsset:beginPlacement,onUndo:()=>guarded(()=>studio.kernel.undo()),onRedo:()=>guarded(()=>studio.kernel.redo()),onRotate:()=>guarded(()=>mode==='placement'?Promise.resolve(studio.tools.placement.rotate(90)):mode==='prefab'?(toast(root,'Coloca el prefab y luego rota sus piezas.'),Promise.resolve(null)):creator.rotateSelection(90)),onDuplicate:()=>guarded(()=>creator.duplicateSelection()),onScale:action=>guarded(()=>creator.scaleSelection(action==='reset'?{value:1}:{delta:action==='down'?-.1:.1})),onDelete:()=>guarded(()=>creator.removeSelection()),onSelectEntity:(id,{append=false}={})=>{if(append)studio.kernel.selection.add(id);else studio.kernel.selection.set(id);updateShell();},onPropertyChange:(prop,value)=>guarded(()=>changeProperty(prop,value)),onBrushSize:size=>{studio.tools.terrain.configure({brushSize:size});updateShell();},onErase:erase=>{if(mode==='terrain'||mode==='path'){studio.tools.terrain.configure({erase});updateShell();}},onPlay:()=>guarded(togglePlaytest),onSave:()=>guarded(async()=>{await saveDraft();toast(root,'Studio guardado');}),onFocus:focusSelection,renderAssetPreview:phoneShell?renderPhoneAssetPreview:(canvas,asset)=>studio.assetPreview.renderThumbnail(canvas,asset),onClose:()=>{void closeKeloStudioLive({root});}});
+    // Mobile core defers the optional palette; mount it here after the live shell exists.
+    // Desktop retains Studio's existing palette owner.
+    if(phoneShell){
+      try{
+        const {createStudioAssetPalette}=await import('../ui/studio-asset-palette.mjs?v=external-library-live-1');
+        assetPalette=createStudioAssetPalette({root,getAssets:()=>allAssets(),onSelect:id=>beginPlacement(id),renderAssetPreview:(canvas,asset)=>studio.assetPreview.renderThumbnail(canvas,asset)});
+      }catch(error){console.warn('[Kelo Studio] asset palette unavailable',error);}
+    }
     try{root.document.getElementById('kelo-world-launch-curtain')?.remove();}catch{}
     if(phoneShell){(root.setTimeout||setTimeout)(async()=>{if(!running||productivity)return;try{const pace=await import('./studio-boot-pace.mjs');await pace.whenStudioIdle(root,{timeoutMs:600});await pace.pauseStudioBoot(root,40);}catch{}if(!running||productivity)return;const prodUi=await import('../ui/creator-productivity-panel.mjs');if(!running||productivity)return;try{const pace=await import('./studio-boot-pace.mjs');await pace.pauseStudioBoot(root,48);}catch{}if(!running||productivity)return;productivity=prodUi.createCreatorProductivityPanel({shell,onCameraToggle:on=>{setMode(on?'camera':'select');return mode==='camera';},onZoomIn:()=>{const z=cameraController.setZoom(cameraController.zoom*1.2);updateShell();return z;},onZoomOut:()=>{const z=cameraController.setZoom(cameraController.zoom/1.2);updateShell();return z;},onZoomReset:()=>{const z=cameraController.setZoom(1);updateShell();return z;},onCopy:()=>{const count=creator.copySelection();productivity?.setClipboard(count);toast(root,count?`${count} objeto${count===1?'':'s'} copiado${count===1?'':'s'}`:'Selecciona algo para copiar');return count;},onPaste:()=>guarded(()=>creator.pasteClipboard()),onSavePrefab:async label=>{try{const def=await prefabLibrary.captureSelection({label});shell.setAssets(allAssets());toast(root,`${def.label} guardado en My Prefabs`);return def;}catch(e){toast(root,e.message||String(e));return false;}},onValidate:async()=>validateMap(),onSnapChange:size=>{snapSize=Math.max(1,Number(size)||1);gridOverlay.configure({size:snapSize});toast(root,snapSize===1?'Snap libre':`Snap ${snapSize}px`);},onGridToggle:visible=>gridOverlay.configure({visible})});productivity.setSnap(snapSize);},22000);}else {productivity=createCreatorProductivityPanel({shell,onCameraToggle:on=>{setMode(on?'camera':'select');return mode==='camera';},onZoomIn:()=>{const z=cameraController.setZoom(cameraController.zoom*1.2);updateShell();return z;},onZoomOut:()=>{const z=cameraController.setZoom(cameraController.zoom/1.2);updateShell();return z;},onZoomReset:()=>{const z=cameraController.setZoom(1);updateShell();return z;},onCopy:()=>{const count=creator.copySelection();productivity?.setClipboard(count);toast(root,count?`${count} objeto${count===1?'':'s'} copiado${count===1?'':'s'}`:'Selecciona algo para copiar');return count;},onPaste:()=>guarded(()=>creator.pasteClipboard()),onSavePrefab:async label=>{try{const def=await prefabLibrary.captureSelection({label});shell.setAssets(allAssets());toast(root,`${def.label} guardado en My Prefabs`);return def;}catch(e){toast(root,e.message||String(e));return false;}},onValidate:async()=>validateMap(),onSnapChange:size=>{snapSize=Math.max(1,Number(size)||1);gridOverlay.configure({size:snapSize});toast(root,snapSize===1?'Snap libre':`Snap ${snapSize}px`);},onGridToggle:visible=>gridOverlay.configure({visible})});productivity.setSnap(snapSize);}selectionUnsub=studio.kernel.selection.onChange(updateShell);updateShell();
     void prefabLibrary.load().then(()=>{if(isPhone(root))return;try{shell?.setAssets?.(allAssets());updateShell();}catch{}}).catch(e=>console.warn('[Kelo Studio] creator prefab cache unavailable',e));
@@ -431,7 +434,7 @@ export async function openKeloStudioLive({root=globalThis}={}){
       const bridge=await import('./library-build-bridge.mjs?v=external-studio-handoff-1');
       const result=await bridge.startPersonalAssetPlacement({root,session:liveSession,assetId:id});
       try{shell?.closeAssets?.();}catch{}
-      try{assetPalette?.close?.();}catch{}
+      try{(assetPalette||studio.assetPalette)?.close?.();}catch{}
       toast(root,result.mode==='tileset'?'Elige una pieza del tileset':'Asset externo listo · toca el mapa para colocarlo');
       updateShell();return result;
     };
