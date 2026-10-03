@@ -140,7 +140,7 @@
       "source": "src/creators/assets/asset-sheet-compiler.mjs",
       "technicalDoc": "docs/systems/CREATOR_ASSET_BRIDGE.md",
       "playerVisible": false,
-      "status": "creator-local-file-bridge-v2-meta-space-compiler"
+      "status": "creator-local-file-bridge-v2-grid-tilesets"
     },
     {
       "id": "asset-bit-ratchet",

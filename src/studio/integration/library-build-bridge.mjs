@@ -10,6 +10,73 @@
 import {seedCatalogPrefabs} from '../adapters/catalog-prefab-seeder.mjs';
 import {buildSemanticPalette,semanticRoleCounts} from '../tools/semantic-brush-profile.mjs';
 import {prepareSceneImport,sceneHealth} from './scene-fabric.mjs';
+import {getAsset,getManifest,rememberAsset,downloadAsset,integrateContent} from '../../creators/assets/personal-asset-vault.mjs';
+
+// KELO-INDEX TILESET SELECT: UI requests ordinary placement; it never commits a whole sheet.
+export async function startTilesetLibraryPlacement({root=globalThis,session,asset}={}){
+  if(!asset?.id||!session?.studio?.kernel)throw new Error('LIBRARY_TILESET_SESSION_REQUIRED');
+  root.__KELO_TILESET_PICKER__?.destroy?.();
+  session.setMode?.('select');
+  const doc=root.document,panel=doc.createElement('section');
+  panel.id='kelo-tileset-picker';panel.dataset.keloStudioUi='1';
+  panel.style.cssText='position:fixed;z-index:2147483310;right:8px;top:max(120px,calc(var(--kcad-header-bottom,112px) + 8px));width:min(340px,calc(100vw - 16px));max-height:calc(100vh - max(120px,calc(var(--kcad-header-bottom,112px) + 8px)) - max(90px,calc(env(safe-area-inset-bottom) + 78px)));overflow:auto;padding:10px;border:1px solid #927b42;border-radius:14px;background:#101820;color:#fff;font:12px system-ui;box-sizing:border-box';
+  panel.innerHTML='<div style="display:flex;gap:8px;align-items:center"><b style="flex:1">Elegir tile</b><button type="button" data-tileset-toggle>Cambiar tile</button><button type="button" data-tileset-close aria-label="Cerrar tileset">×</button></div><div data-tileset-body><p data-tileset-name></p><div style="display:flex;gap:6px;flex-wrap:wrap"><label>Ancho <input data-grid="tileWidth" type="number" min="1" max="512" style="width:58px"></label><label>Alto <input data-grid="tileHeight" type="number" min="1" max="512" style="width:58px"></label><label>Margen <input data-grid="margin" type="number" min="0" max="128" style="width:48px"></label><label>Separación <input data-grid="spacing" type="number" min="0" max="128" style="width:48px"></label></div><button type="button" data-tileset-prepare>Usar tileset</button><p data-tileset-status role="status">Define el tamaño en píxeles y elige una pieza para colocarla en el mapa.</p><div data-tileset-tiles style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px"></div><div style="display:flex;gap:8px;align-items:center;margin-top:8px"><button type="button" data-tileset-prev>Anterior</button><span data-tileset-page></span><button type="button" data-tileset-next>Siguiente</button></div></div>';
+  panel.querySelectorAll('button').forEach(b=>b.style.cssText='min-height:44px;min-width:44px;border:1px solid #665c40;border-radius:8px;background:#20302c;color:white;cursor:pointer');
+  const host=doc.getElementById('kelo-studio-live')||doc.body;host.append(panel);
+  let destroyed=false,busy=false,page=0,templates=[],observer=null;
+  const controller={mode:'tileset',assetId:asset.id,panel,destroy};root.__KELO_TILESET_PICKER__=controller;
+  observer=root.MutationObserver?new root.MutationObserver(()=>{if(!panel.isConnected)destroy();}):null;
+  observer?.observe(doc.body,{childList:true,subtree:true});
+  const body=panel.querySelector('[data-tileset-body]'),status=panel.querySelector('[data-tileset-status]'),prepare=panel.querySelector('[data-tileset-prepare]');
+  panel.querySelector('[data-tileset-name]').textContent=asset.name||asset.id;
+  const existing=await getAsset(asset.id);
+  if(destroyed||!panel.isConnected){destroy();return controller;}
+  const manifest=await getManifest(asset.id);
+  if(destroyed||!panel.isConnected){destroy();return controller;}
+  const grid=manifest?.grid||existing?.tileGrid||asset.tileGrid||{};
+  for(const input of panel.querySelectorAll('[data-grid]'))input.value=grid[input.dataset.grid]??(input.dataset.grid==='tileWidth'||input.dataset.grid==='tileHeight'?32:0);
+  function destroy(){if(destroyed)return;destroyed=true;observer?.disconnect();panel.remove();if(root.__KELO_TILESET_PICKER__===controller)root.__KELO_TILESET_PICKER__=null;}
+  function render(){
+    const list=panel.querySelector('[data-tileset-tiles]');list.replaceChildren();
+    const pages=Math.max(1,Math.ceil(templates.length/48));page=Math.min(page,pages-1);
+    for(const template of templates.slice(page*48,(page+1)*48)){
+      const button=doc.createElement('button');button.type='button';button.dataset.tileTemplate=template.id;button.title=template.label;button.setAttribute('aria-label',template.label);
+      button.style.cssText='min-height:44px;min-width:0;padding:3px;border:1px solid #536658;border-radius:6px;background:#20302c;color:white';
+      const canvas=doc.createElement('canvas');canvas.width=40;canvas.height=40;canvas.style.cssText='width:100%;height:40px;object-fit:contain;image-rendering:pixelated';button.append(canvas);list.append(button);
+      void session.studio.assetPreview.renderThumbnail(canvas,template,{cssSize:40}).catch(()=>{});
+      button.onclick=()=>{session.setSnapSize?.(template.snap);session.beginPlacement(template.id);status.textContent=`${template.label} · toca el mapa para colocar. Cambiar tile abre estas piezas.`;body.hidden=true;};
+    }
+    panel.querySelector('[data-tileset-page]').textContent=templates.length?`${page+1}/${pages} · ${templates.length} tiles`:'';
+    panel.querySelector('[data-tileset-prev]').disabled=page===0;
+    panel.querySelector('[data-tileset-next]').disabled=page>=pages-1;
+  }
+  async function showCompiled(compiled){
+    await ensurePersonalVisualRegistered(root,asset.id);
+    if(destroyed)return;
+    seedCatalogPrefabs({prefabRegistry:session.studio.kernel.prefabs,assetCatalog:catalogFor(root,session)});
+    const ids=new Set(compiled.assets.filter(f=>f.gridSignature===compiled.grid?.signature).map(f=>`personal:${asset.id}:${f.frameId}`));
+    session.refreshAssets?.();
+    templates=listPersonalBuildTemplates({root,session,assetId:asset.id}).filter(row=>ids.has(row.id));page=0;render();
+    status.textContent=templates.length?'Toca una pieza y después el mapa. Puedes repetirla o cambiar de tile.':'No hay piezas en esta cuadrícula.';
+    prepare.textContent='Actualizar cuadrícula';
+  }
+  prepare.onclick=async()=>{
+    if(busy||destroyed)return;busy=true;prepare.disabled=true;status.textContent='Preparando tileset…';
+    try{
+      const tileGrid=Object.fromEntries([...panel.querySelectorAll('[data-grid]')].map(input=>[input.dataset.grid,Number(input.value)]));
+      let local=await getAsset(asset.id);if(!local?.downloaded)local=await downloadAsset({...asset,tileGrid});
+      await rememberAsset({...local,tileGrid});
+      const result=await integrateContent(asset.id);if(!destroyed)await showCompiled(result.manifest);
+    }catch(error){if(!destroyed)status.textContent=`No se pudo preparar: ${String(error?.message||error).replaceAll('_',' ')}`;}
+    finally{busy=false;if(!destroyed)prepare.disabled=false;}
+  };
+  panel.querySelector('[data-tileset-toggle]').onclick=()=>{body.hidden=!body.hidden;};
+  panel.querySelector('[data-tileset-close]').onclick=destroy;
+  panel.querySelector('[data-tileset-prev]').onclick=()=>{page=Math.max(0,page-1);render();};
+  panel.querySelector('[data-tileset-next]').onclick=()=>{page++;render();};
+  if(manifest?.grid)await showCompiled(manifest);
+  return controller;
+}
 
 const text=value=>String(value??'').trim();
 
@@ -75,6 +142,7 @@ async function startVisual({root,session,assetId,templateId}){
   const studio=session?.studio,kernel=studio?.kernel,catalog=catalogFor(root,session);
   if(!studio||!kernel||!catalog)throw new Error('LIBRARY_BUILD_STUDIO_NOT_READY');
   seedCatalogPrefabs({prefabRegistry:kernel.prefabs,assetCatalog:catalog});
+  session.refreshAssets?.();
   const rows=listPersonalBuildTemplates({root,session,assetId});
   const template=choosePersonalBuildTemplate(rows,templateId);
   if(!template)throw new Error('LIBRARY_BUILD_TEMPLATE_NOT_READY');
@@ -135,6 +203,9 @@ export async function refreshPersonalAssetPalette({root=globalThis,session,asset
 export async function startPersonalAssetPlacement({root=globalThis,session,assetId,templateId=null,prepareScenePainter=true}={}){
   const id=text(assetId);if(!id)throw new Error('LIBRARY_BUILD_ASSET_ID_REQUIRED');
   if(!session?.studio?.kernel)throw new Error('LIBRARY_BUILD_SESSION_REQUIRED');
+  const asset=globalThis.indexedDB?await getAsset(id):null;
+  if(asset?.contentKind==='tileset'&&!templateId)return startTilesetLibraryPlacement({root,session,asset});
+  root.__KELO_TILESET_PICKER__?.destroy?.();
   let result=await startScene({root,session,assetId:id}).catch(()=>null);
   if(!result)result=await startVisual({root,session,assetId:id,templateId});
   let painterReady=false;

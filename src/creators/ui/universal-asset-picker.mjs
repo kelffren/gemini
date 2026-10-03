@@ -3,10 +3,10 @@
  * owner: Kelo Creators
  * purpose: one Library entry point for World, Ability, NPC and Sprite-family workspaces
  */
-const KIND_BY_WORKSPACE=Object.freeze({world:'image',ability:'vfx',npc:'sprite','sprite-ability':'sprite',animation:'sprite',vfx:'vfx',appearance:'sprite',avatar:'sprite'});
+const KIND_BY_WORKSPACE=Object.freeze({world:'all',ability:'vfx',npc:'sprite','sprite-ability':'sprite',animation:'sprite',vfx:'vfx',appearance:'sprite',avatar:'sprite'});
 const LABEL_BY_WORKSPACE=Object.freeze({world:'LIBRARY',ability:'ASSETS',npc:'SPRITES','sprite-ability':'LIBRARY',animation:'SPRITES',vfx:'LIBRARY',appearance:'LIBRARY',avatar:'LIBRARY'});
 function notify(root,msg){if(typeof root?.showToast==='function')root.showToast(msg);else console.info('[Kelo Asset Picker]',msg);}
-function pickerUrl(root,workspace){const url=new URL('asset-vault.html?v=20261001-nofreeze',root.location?.href||location.href);url.searchParams.set('picker','1');url.searchParams.set('context',workspace);url.searchParams.set('kind',KIND_BY_WORKSPACE[workspace]||'all');return url.href;}
+function pickerUrl(root,workspace){const url=new URL('asset-vault.html?v=20261003-tileset',root.location?.href||location.href);url.searchParams.set('picker','1');url.searchParams.set('context',workspace);url.searchParams.set('kind',KIND_BY_WORKSPACE[workspace]||'all');return url.href;}
 export function installUniversalAssetPicker({root=globalThis,workspace='generic',session=null}={}){
   const doc=root?.document;if(!doc?.body)return()=>{};
   const id='kelo-universal-asset-picker-'+workspace;doc.getElementById(id)?.remove();
@@ -20,7 +20,7 @@ export function installUniversalAssetPicker({root=globalThis,workspace='generic'
     const asset=event.data.asset;if(!asset?.id)return;
     try{
       if(workspace==='world'&&session?.studio?.kernel){
-        const mod=await import('../../studio/integration/external-live-preview-bridge.mjs?v=universal-picker-1');
+        const mod=await import('../../studio/integration/external-live-preview-bridge.mjs?v=tileset-picker-2');
         await mod.startExternalAssetPreview({root,session,asset});
         return;
       }

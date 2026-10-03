@@ -48,7 +48,7 @@ La carpeta filtra templates reales; no duplica assets.
 
 `Property Catalog → palette row → preview → placement tool → Studio command → draft/world authority`
 
-Los previews usan Asset Preview Service + Atlas Contract.
+Los previews usan Asset Preview Service + Atlas Contract. Los tilesets externos usan la cuadrícula del Asset Sheet Compiler y un selector de piezas en Library Build Bridge; cada pieza entra por placement, sin colocar la hoja completa. La sesión ofrece `refreshAssets()` y `setSnapSize(size)` para refrescar el catálogo y alinear piezas de 16/32/etc. píxeles sin reabrir World.
 La limpieza del minimapa heredado excluye `[data-kelo-studio-ui]`; de lo contrario elimina los canvas de miniatura de la biblioteca móvil.
 
 ## Mobile UX
