@@ -13,7 +13,7 @@ export async function createGreenwildSpriteBank(){
   return F(bank);
 }
 export function createPvePresenter({ctx=globalThis.ctx,camera=globalThis.camera,spriteBank=null,now=()=>performance.now()}={}){
-  function screenPoint(e){const c=camera||{x:0,y:0};return{x:(Number(e.x)||0)-(Number(c.x)||0),y:(Number(e.y)||0)-(Number(c.y)||0)}}
+  function screenPoint(e){if(globalThis.KeloCamera?.worldToScreenPoint)return globalThis.KeloCamera.worldToScreenPoint(Number(e.x)||0,Number(e.y)||0);const c=camera||{x:0,y:0};const sw=globalThis.innerWidth||0,sh=globalThis.innerHeight||0;return{x:(Number(e.x)||0)-(Number(c.x)||0)+sw/2,y:(Number(e.y)||0)-(Number(c.y)||0)+sh/2}}
   function body(enemy,p,r){
     const row=spriteBank?.[enemy.family],img=row?.image;
     if(img?.naturalWidth&&img?.naturalHeight){
