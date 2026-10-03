@@ -1,0 +1,5 @@
+const assert=require('assert');const G=require('../src/systems/gathering-system.js'),A=require('../src/systems/pve-actor-system.js'),B=require('../src/systems/pve-brain-system.js');
+assert.equal(G.canGather('iron_vein',{tools:[],skill:5}).error,'TOOL_REQUIRED');assert.equal(G.canGather('iron_vein',{tools:['pickaxe'],skill:1}).ok,true);
+const wolf=A.createActor('verdant_wolf',{id:'w1',x:0,y:0,level:2});assert(wolf&&wolf.hp>0);assert.equal(B.decide(wolf,{spawn:{x:0,y:0},target:{id:'p',x:40,y:0}}).type,'ATTACK');assert.equal(B.decide(wolf,{spawn:{x:0,y:0},target:{id:'p',x:300,y:0}}).type,'IDLE');
+const archer=A.createActor('bandit_archer',{id:'a1',x:0,y:0});assert.equal(B.decide(archer,{spawn:{x:0,y:0},target:{id:'p',x:30,y:0}}).type,'REPOSITION');
+(async()=>{let cmd;const r=await G.gather({nodeId:'olive_tree',skill:1},{transact:async x=>(cmd=x,{ok:true})});assert(r.ok);assert.equal(cmd.type,'GatherResource');console.log('pve-foundation: ok');})().catch(e=>{console.error(e);process.exit(1);});
