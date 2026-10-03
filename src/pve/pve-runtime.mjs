@@ -29,6 +29,8 @@ export function createEnemyActor(spec={},options={}){
   function setState(next){if(actor.state===next)return;actor.state=next;actor.stateMs=0;emit('enemy-state',{state:next})}
   return F({
     get snapshot(){return F({...actor,events:F(events.slice(-20))})},
+    setPosition(x,y){if(actor.dead)return this.snapshot;actor.x=Number(x)||0;actor.y=Number(y)||0;return this.snapshot},
+    setHp(value,meta={}){if(actor.dead)return this.snapshot;const before=actor.hp;actor.hp=clamp(Number(value)||0,0,actor.maxHp);if(actor.hp<before)emit('enemy-damaged',{amount:before-actor.hp,hp:actor.hp,sourceId:meta.sourceId||meta.source||null});return this.snapshot},
     update(dtMs,{target=null}={}){
       if(actor.dead)return this.snapshot;
       const dt=Math.max(0,Number(dtMs)||0);actor.stateMs+=dt;actor.target=target;
@@ -62,6 +64,8 @@ export function createEncounterRuntime(plan=[],options={}){
     update(dtMs,context={}){for(const actor of actors.values())actor.update(dtMs,context);return this.snapshot()},
     damage(enemyId,amount,meta={}){const actor=actors.get(String(enemyId));if(!actor)throw new Error('PVE_ENEMY_UNKNOWN:'+enemyId);return actor.damage(amount,meta)},
     snapshot(){return F([...actors.values()].map(a=>a.snapshot))},
+    actor(enemyId){return actors.get(String(enemyId))||null},
+    finalizeDeath(enemyId,meta={}){const actor=actors.get(String(enemyId));if(!actor)throw new Error('PVE_ENEMY_UNKNOWN:'+enemyId);if(actor.snapshot.dead)return F({dead:true,hp:0,drops:F([])});return actor.damage(actor.snapshot.hp||1,meta)},
     get cleared(){return [...actors.values()].every(a=>a.snapshot.dead)}
   });
 }
