@@ -11,7 +11,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: '24.20.0', cache: npm}
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install chromium
       - run: |
           python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/server.log 2>&1 &
           npx playwright test tests/pve-wolf-visual-proof.spec.js --project=chromium
