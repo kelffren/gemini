@@ -250,3 +250,136 @@ HOW many comparable examples exist,
 and WHY its exact history cannot be recreated.
 
 That is the canonical direction for Kelo World's watch collecting system.
+
+
+## 18. Genesis Event — The Founders 100
+At the opening Genesis event, the server mints exactly 100 Founder watches:
+FOUNDERS #001 through FOUNDERS #100.
+
+Rules:
+- The server never mints #101 or replacements.
+- Each has the permanent, non-copyable Founder’s Blessing.
+- Initial target: +15% experience while the physical Founder watch is carried in the player's eligible inventory.
+- Storing the watch remotely does not grant the bonus.
+- In explicitly designated loot-risk PvP content, death while carrying it has an initial 50% chance to drop the watch.
+- The watch itself is never destroyed by this drop.
+- Whoever legitimately acquires it receives the complete artifact and provenance.
+- Capture, gift, inheritance, sale and recovery events are permanently recorded.
+- No insurance may erase the intended Founder PvP risk.
+- If Founder watches disappear into inactive accounts, the server does not create replacements. Reduced circulating supply becomes part of world history.
+
+The +15% and 50% values are initial design targets and must remain server-configurable for balance testing.
+
+## 19. Monthly Champion Stars
+Every competitive period (initial target: one month), one official champion receives the exclusive right to engrave that period's Champion Star.
+
+A star contains immutable provenance:
+- champion player ID/display identity at engraving time
+- championship period
+- watch serial
+- timestamp
+- champion qualification proof/reference
+- champion power snapshot
+- power contribution granted
+- engraving sequence/edition when limited
+
+When the champion's engraving window ends, that month's star can never be newly produced again.
+
+### Limited engraving supply
+The champion receives a finite number of engraving charges for that championship period. Initial target: 10.
+
+This creates scarcity based on a real player decision: the champion chooses which watches receive their historical mark. Unused charges expire at the end of the window and are not recreated.
+
+### Safe contract vs direct trust
+Two supported routes:
+1. Engraving Contract — the owner escrows the watch and payment; the champion receives only the permission necessary to engrave. The system charges a meaningful KC fee as an economy sink.
+2. Direct Transfer — the owner voluntarily transfers control of the watch to the champion. The champion may return it, trade it, or keep it according to normal game rules.
+
+Before Direct Transfer, UI must explicitly state that ownership/control is being transferred and that return is not guaranteed. Social betrayal can therefore exist as an intentional game risk, not as deceptive UI.
+
+Do not support real-money scams, impersonation, account theft or out-of-game deception as game mechanics.
+
+### Objective trust history
+Instead of a simple five-star reputation rating, expose factual history where appropriate:
+- engraving contracts completed
+- direct-transfer watches received
+- direct-transfer watches subsequently returned
+- escrow contracts fulfilled/defaulted where applicable
+- historical value/number of artifacts worked on
+
+Repeated fake transfers or alt-account loops must not create prestige.
+
+## 20. Champion Power Imprint
+A Champion Star is both provenance and a permanent power imprint.
+
+At the instant of engraving, the server snapshots the champion's authoritative eligible power. The resulting bonus is permanently bound to that specific star/watch even if the champion later changes equipment, loses rank or stops playing.
+
+Initial conversion target:
+10,000 eligible champion power = +1 Watch Power Point.
+
+Example:
+Champion power at engraving: 10,000
+Star: OCT-2026
+Permanent contribution: +1 Watch Power Point
+
+A later champion with 30,000 eligible power could contribute +3 raw Watch Power Points under the same baseline conversion.
+
+The exact conversion curve MUST be configurable and should not necessarily remain linear at high values.
+
+### Power stacking and long-term balance
+Historical watches should become stronger as meaningful champions engrave them, but infinite seasons must not create infinite combat dominance.
+
+Use three layers:
+- Raw Historical Power: never capped; records the full amount contributed throughout history and is collector value.
+- Effective Watch Power: gameplay power derived from Raw Historical Power through a diminishing-returns curve and/or season-adjusted cap.
+- Provenance Power: collector metric representing who contributed, when, and under what championship strength; never deleted by balance patches.
+
+This means a 20-year-old Grail can truthfully contain enormous historical power without automatically one-shotting new players.
+
+Candidate effective-power model (balancing placeholder, not final):
+effective = SCALE * log(1 + rawHistoricalPower / SCALE)
+
+Alternative curves/caps should be simulation-tested before implementation.
+
+### Preventing temporary power manipulation
+The engraving snapshot must NOT blindly read a UI combat number.
+
+Eligible Champion Power should be server-authoritative and may use:
+- validated equipped build
+- championship-eligible stats
+- normalized competitive power
+- anti-borrowing/anti-swap eligibility window
+- snapshot of the build actually used to qualify/win where appropriate
+
+This prevents a champion borrowing every high-power item for 30 seconds solely to inflate an engraving.
+
+### Multi-champion Grails
+A watch may accumulate Champion Stars from different periods.
+
+Example:
+FOUNDERS #007
+Founder’s Blessing: +15% XP
+OCT 2026 Star — Champion A — 10,000 snapshot — +1 raw power
+FEB 2027 Star — Champion B — 24,000 snapshot — contribution according to curve
+AUG 2027 Star — Champion C — 31,000 snapshot — contribution according to curve
+
+The passport shows each star separately. Their identities are never merged into an anonymous stat.
+
+A community category such as “Grand Slam” can emerge for watches carrying many historically important champion engravings. Prefer objective requirements if the system later recognizes such a title.
+
+## 21. Why Champion engraving creates collector value
+Champion engraving combines:
+- time-limited scarcity
+- limited supply
+- human choice
+- social negotiation
+- trust/risk
+- permanent provenance
+- measurable contribution
+- gameplay utility
+- irreversible history
+
+The desired fantasy is not merely “this watch has +8 attack.” It is:
+“Eight real champions, across several years, personally chose or agreed to work on this exact serial, and their historical power remains embedded in it.”
+
+The passport must always preserve that explanation.
