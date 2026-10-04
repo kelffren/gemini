@@ -661,3 +661,206 @@ The system should target competitive pride through transparent in-game accomplis
 A clan sitting on a mountain of relic wealth should feel powerful, but it should also feel like the whole server can see the mountain.
 
 Relic ownership is not the end of the game. It creates content for the next conflict.
+
+
+## 24. Player Notoriety States — RED, BLACK and BLUE
+
+Kelo World uses visible player notoriety states to turn criminal activity into risk, identity and server-generated PvP content.
+
+All thresholds below are initial balancing targets and must remain server-configurable.
+
+### RED — Recent Killer
+A qualifying criminal player kill puts the offender into RED state.
+
+Presentation:
+- player name flashes RED while the recent-killer state is active;
+- the state is publicly readable enough that other players understand the risk.
+
+Initial death-risk target:
+- 15% chance for one eligible carried item to enter the criminal-loss flow when the RED player is defeated under eligible rules.
+
+The resulting flow may include an eligible killer claim, jail/fine resolution where applicable, or forfeiture depending on the specific system. Protected/quest-bound/non-droppable assets remain governed by their own rules.
+
+### BLACK — Dangerous Killer
+If a player commits 3 qualifying criminal kills within a rolling 30-minute window, the player enters BLACK state.
+
+Initial death-risk target:
+- 50% chance for one eligible carried item to enter the criminal-loss flow on an eligible defeat.
+
+BLACK represents deliberate escalation and should be visually unmistakable.
+
+Exact duration, decay and cleansing rules must prevent arranged kills, alt abuse and bounty farming.
+
+### BLUE FLASHING — Recent Relic Thief
+Stealing/capturing a qualifying watch from another player creates a recent-theft state.
+
+For the first 24 hours after the qualifying theft:
+- the player's name flashes BLUE;
+- storing the stolen watch in a vault does NOT remove the status;
+- transferring or hiding the watch does NOT erase the player's recent-theft record.
+
+The notoriety belongs to the offender's history, not merely to possession of the stolen object.
+
+### BLUE — Notorious Watch Thief
+A player who steals more than 3 qualifying watches within the configured rolling monthly window becomes a notorious relic thief.
+
+BLUE identifies a player with an established theft history. If that player also stole a watch within the last 24 hours, the BLUE state flashes.
+
+### Combined states
+States may coexist.
+
+A player can simultaneously be:
+- BLACK Killer;
+- BLUE Notorious Relic Thief;
+- BLUE FLASHING Recent Relic Thief;
+- a high-ranking Wanted player.
+
+Authorized hunting of an eligible criminal target must not automatically criminalize the hunter merely for completing a valid hunt.
+
+## 25. Most Wanted — Server Criminal Ranking
+
+Criminal activity generates **Notoriety Points** and feeds a server-wide Most Wanted leaderboard.
+
+The ranking turns criminal play into a high-risk/high-reward career rather than a pure punishment system.
+
+### Notoriety Points
+Points may be generated from server-validated criminal events such as:
+- qualifying criminal kills;
+- escalation into BLACK;
+- qualifying watch/relic thefts;
+- value/historical importance of stolen relics;
+- successful escapes while actively wanted;
+- other future high-risk criminal objectives.
+
+Repeated low-value actions against the same accounts must rapidly lose or receive zero ranking value.
+
+Notoriety Points are not permanent prestige. They use decay/rolling activity so inactive criminals eventually leave the active Most Wanted ranking.
+
+### Top 100
+The 100 players with the highest eligible active Notoriety become the server's **Most Wanted 100**.
+
+The leaderboard should expose enough information to create hunting pressure without revealing private or real-world information.
+
+Example:
+
+MOST WANTED
+
+#1  KELO       BLACK / BLUE     18,420 Notoriety
+#2  RAGNAR     BLUE             16,880 Notoriety
+...
+#100 ZERO       RED               2,410 Notoriety
+
+### Periodic server bounties
+Players inside the Top 100 can periodically receive server-funded bounties.
+
+A bounty creates a limited, server-authoritative opportunity for eligible hunters to defeat the target.
+
+Successful first eligible defeat:
+- pays the strongest configured hunter reward;
+- causes the Wanted target to lose a meaningful but bounded amount of eligible XP;
+- records the bounty outcome in criminal history where appropriate.
+
+Repeated defeats of the same target by the same hunter/group rapidly diminish in value.
+
+Initial conceptual reward decay:
+- first valid bounty defeat: 100% reward;
+- second: approximately 35%;
+- third: approximately 10%;
+- subsequent repeated farming: approximately 0% until the relevant anti-farm/reset condition is satisfied.
+
+Exact values are balancing targets, not hard-coded promises.
+
+The system should also use account/party/clan/device/risk signals where legally and technically appropriate to detect arranged bounty farming and alt loops.
+
+### XP loss for the Wanted target
+A completed server bounty may remove eligible player XP from the Wanted criminal.
+
+XP loss must:
+- be capped;
+- never create negative XP;
+- avoid destroying months of progression in a single ordinary death;
+- scale with Wanted tier/risk where appropriate;
+- be server-authoritative;
+- not become transferable XP that enables farming unless a separately balanced mechanic explicitly allows it.
+
+The emotional goal is that carrying a large bounty feels dangerous without making one death a reason to quit the game.
+
+### Criminal Gold Bonus
+The Most Wanted ranking has an upside.
+
+While a player remains inside the active Top 100, eligible gold earned through configured gameplay sources receives a **Wanted Gold Bonus**.
+
+Initial target:
+- Rank #1: +15% eligible gold.
+- Bonus declines progressively through the ranking.
+- Rank #100 receives the smallest positive Top-100 bonus.
+
+The exact curve is server-configurable. A simple initial candidate is a smooth rank interpolation, but production balance may use tiers or a nonlinear curve.
+
+The bonus must apply only to eligible server-defined gold sources. It must not multiply:
+- player-to-player transfers;
+- market wash trades;
+- alt transfers;
+- refunds;
+- escrow returns;
+- other circular money movement.
+
+This prevents criminals from manufacturing bonus gold through self-trading.
+
+### Risk/reward identity
+The intended choice is:
+
+Become more criminal
+→ gain Notoriety
+→ climb Most Wanted
+→ earn a larger gold multiplier
+→ attract stronger/frequent bounties
+→ risk XP and eligible items when defeated.
+
+At #1, the player should feel both rich and hunted.
+
+The system must never make criminality objectively mandatory for optimal progression. Lawful players need their own competitive economic paths.
+
+### Bounty value
+Hunter rewards should scale from meaningful server-authoritative signals rather than a flat BLUE/BLACK payment.
+
+Candidate signals:
+- target Wanted rank;
+- active Notoriety;
+- criminal activity recency;
+- value/significance of qualifying relic thefts;
+- BLACK/BLUE state;
+- target power band;
+- current bounty history.
+
+Rewards must use caps and diminishing returns so killing a wanted player is exciting but cannot become the dominant XP exploit.
+
+### Anti-farm and anti-collusion
+At minimum:
+- same hunter vs same target has steep diminishing returns;
+- same party/clan/linked participants cannot rotate kills for full rewards;
+- suspicious reciprocal kills contribute little or zero;
+- repeated thefts between cooperating accounts do not create full Notoriety;
+- fake relic transfers do not create legitimate theft events;
+- bounty eligibility and rewards are calculated server-side;
+- logout/login does not clear active notoriety;
+- vaulting a stolen relic does not clear BLUE FLASHING;
+- rank manipulation through trivial victims is suppressed.
+
+### Emotional objective
+Most Wanted should create recognizable server characters.
+
+Players should say:
+“#3 just entered our zone.”
+“There is a bounty on #1.”
+“He stole FOUNDERS #031 yesterday.”
+“If we kill him now, the server bounty is active.”
+
+The criminal player receives fame, economic upside and identity.
+
+The rest of the server receives a valuable target.
+
+### Design law
+**Notoriety is both an asset and a liability.**
+
+The higher a player climbs, the more profitable the outlaw lifestyle becomes — and the more valuable that player becomes to everyone hunting them.
