@@ -1,0 +1,32 @@
+name: Authored City Proof
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/world/map-forge/map-forge-authored-capital.mjs'
+      - 'src/world/map-forge/map-forge-core.mjs'
+      - '.github/workflows/authored-city-proof.yml'
+  workflow_dispatch:
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.20.0'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Map Forge authored city mobile proof
+        run: npx playwright test tests/map-forge-mobile-preview.spec.js --config=playwright.map-forge-ios.config.js --grep "real preview"
+      - name: Upload city screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authored-city-proof
+          path: test-results/*.png
+          if-no-files-found: warn
