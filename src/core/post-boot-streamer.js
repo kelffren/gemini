@@ -22,7 +22,7 @@
     'src/systems/arena-progression-hot-owner.js?v=1',
     'src/systems/liveops-world-content-hot-owner.js?v=1',
     'src/systems/liveops-interaction-runtime.js?v=1',
-    'src/systems/liveops-npc-world-runtime.js?v=20261004npc',
+    'src/systems/liveops-npc-world-runtime.js?v=20261004stroll',
     'src/core/update-gate.js?v=8-hot-data',
     'src/core/session-continuity-system.js?v=2-update-classes',
     'src/core/session-continuity-retry.js?v=1-event-driven',

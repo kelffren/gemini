@@ -53,3 +53,4 @@ The plaza people you can talk to are still this catalog plus `KeloLiveOpsNpcWorl
 - `retiredVisual` stays true so World Builder does not treat the cast sheet as terrain.
 - If the sheet is not ready, the same owner draws the geometric fallback. No second renderer.
 - `plaza_guide` remains the giver of `welcome_to_kelo`. The visible name may change without changing that id.
+- Stroll is presentation only: a scripted oval on the existing render hook, not NPC AI, not a second loop, and not a JSON field. Opening that NPC's dialogue holds them in place.

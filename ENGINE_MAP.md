@@ -169,7 +169,7 @@ El runtime continúa consumiendo las rutas actuales hasta un pass separado de pr
 
 ### Plaza NPC cast
 
-La gente hablable de la plaza es `KeloLiveOpsNpcWorld` (post-boot), no un renderer nuevo. Texto y misiones: `src/systems/liveops-world-content.json`. Sprites: atlas opcional `plazaNpcs` vía `KELO_ATLAS_CONTRACT`. El frame vive en el placement, no en el JSON HOT. `retiredVisual` del atlas sigue en true para que World Builder no lo use como terreno. No crear un segundo sistema de NPC.
+La gente hablable de la plaza es `KeloLiveOpsNpcWorld` (post-boot), no un renderer nuevo. Texto y misiones: `src/systems/liveops-world-content.json`. Sprites: atlas opcional `plazaNpcs` vía `KELO_ATLAS_CONTRACT`. El frame vive en el placement, no en el JSON HOT. Cada uno pasea un óvalo scripted alrededor de su ancla; no es IA ni otro loop. Si le abres el diálogo, esa persona se queda quieta. `retiredVisual` del atlas sigue en true para que World Builder no lo use como terreno. No crear un segundo sistema de NPC.
 
 ## 9. Online boundary
 

@@ -2,23 +2,33 @@
  * area: LIVEOPS / NPC WORLD RUNTIME
  * owner: KeloLiveOpsNpcWorld
  * keys: NPC WORLD PLACEMENT PROXIMITY SPATIAL GRID PROMPT MOBILE RENDER
- * purpose: coloca NPCs LiveOps en el mundo, renderiza solo celdas visibles y resuelve proximidad sin escanear el catálogo completo por frame
+ * purpose: coloca NPCs LiveOps en el mundo, los pasea en un óvalo scripted, renderiza solo celdas visibles y resuelve proximidad sin escanear el catálogo completo por frame
  * public-api: KeloLiveOpsNpcWorld.getState/getPlacement/getNearest/rebuild/probe
  * consumes: KeloLiveOpsWorldContent, KeloLiveOpsInteraction, KeloPlayerPosition, KeloSimulation, KeloRender, KeloCamera, KeloEvents
- * state-owned: placement registry + spatial grid + nearest interactable presentation state only
- * performance: no second loop; proximity query only after meaningful movement/transition/content change; render culls by visible grid cells
- * do-not: NO player x/y writes, NO collision authority, NO NPC AI, NO timers/intervals/RAF, NO persistence/economy/reward mutation
+ * state-owned: placement registry + scripted stroll pose + spatial grid + nearest interactable presentation state only
+ * performance: no second loop; stroll advances once per existing render frame; proximity query after player movement or meaningful stroll drift
+ * do-not: NO player x/y writes, NO collision authority, NO decision AI, NO timers/intervals/RAF, NO persistence/economy/reward mutation
  */
 (function(root){
 'use strict';
 if(root.KeloLiveOpsNpcWorld)return;
-const VERSION='kelo-liveops-npc-world-v2';
+const VERSION='kelo-liveops-npc-world-v3';
 const OWNER='liveops-npc-world';
 const CELL_SIZE=256;
 const PROBE_STEP=18;
 const EXIT_HYSTERESIS=28;
 const DRAW_MARGIN=96;
 const CAST_DRAW_W=64,CAST_DRAW_H=128,LABEL_RANGE=240;
+const OMEGA=0.62,STROLL_DT_CAP=0.05,DRIFT_PROBE=8;
+const STROLL=Object.freeze({
+  plaza_guide:Object.freeze({rx:78,ry:46,phase:0.4}),
+  dona_sol:Object.freeze({rx:56,ry:32,phase:1.7}),
+  marco:Object.freeze({rx:32,ry:28,phase:2.4}),
+  valentina:Object.freeze({rx:60,ry:32,phase:3.1}),
+  izan:Object.freeze({rx:52,ry:28,phase:4.2}),
+  leandro:Object.freeze({rx:40,ry:36,phase:5.0}),
+  naim:Object.freeze({rx:36,ry:48,phase:0.9})
+});
 const PLACEMENTS=Object.freeze([
   Object.freeze({id:'plaza_guide',surface:'world',x:1440,y:1688,interactionRadius:108,visual:Object.freeze({frame:0,robe:'#1a2744',trim:'#d7b85f',skin:'#d7a47c',accent:'#f0d48a'})}),
   Object.freeze({id:'dona_sol',surface:'world',x:1168,y:1608,interactionRadius:92,visual:Object.freeze({frame:1,robe:'#3a2418',trim:'#e7c56a',skin:'#e0b08a',accent:'#f3df9b'})}),
@@ -29,10 +39,11 @@ const PLACEMENTS=Object.freeze([
   Object.freeze({id:'naim',surface:'world',x:1784,y:1744,interactionRadius:84,visual:Object.freeze({frame:6,robe:'#2a2218',trim:'#e7c56a',skin:'#c9956b',accent:'#f3df9b'})})
 ]);
 const placementById=new Map(PLACEMENTS.map(row=>[row.id,row]));
+const poses=new Map(),clocks=new Map();
 let grid=new Map(),activePlacements=Object.freeze([]),maxInteractionRadius=0;
 let nearestId=null,lastProbeX=NaN,lastProbeY=NaN,lastSurface='world',prompt=null;
 let rebuilds=0,probes=0,spatialCandidates=0,nearestChanges=0,renderFrames=0,renderedNpcs=0,lastError=null;
-let simulationHookId=null,renderHookId=null,castImage=null,castState='idle';
+let simulationHookId=null,renderHookId=null,castImage=null,castState='idle',steppedAt=0,driftSinceProbe=0;
 function content(){return root.KeloLiveOpsWorldContent||null;}
 function interaction(){return root.KeloLiveOpsInteraction||null;}
 function position(){try{return root.KeloPlayerPosition?.capture?.()||null;}catch(_){return null;}}
@@ -51,13 +62,42 @@ function surface(){
 function cell(value){return Math.floor(Number(value||0)/CELL_SIZE);}
 function key(cx,cy){return cx+':'+cy;}
 function insert(row){const k=key(cell(row.x),cell(row.y));if(!grid.has(k))grid.set(k,[]);grid.get(k).push(row);}
+function talkingTo(){try{const s=interaction()?.getState?.();return s&&s.dialogueOpen?s.currentNpcId:null;}catch(_){return null;}}
+function poseFor(row){
+  let pose=poses.get(row.id);
+  if(pose)return pose;
+  const stroll=STROLL[row.id],ang=stroll?stroll.phase:0;
+  pose={id:row.id,surface:row.surface,x:row.x+(stroll?Math.cos(ang)*stroll.rx:0),y:row.y+(stroll?Math.sin(ang)*stroll.ry:0),interactionRadius:row.interactionRadius,visual:row.visual,face:1,bob:0};
+  poses.set(row.id,pose);return pose;
+}
+function stepStroll(now){
+  const dt=steppedAt?Math.min(STROLL_DT_CAP,(now-steppedAt)/1000):0;
+  steppedAt=now;
+  if(!activePlacements.length)return;
+  const hold=talkingTo();
+  grid=new Map();
+  let drift=0;
+  for(let i=0;i<activePlacements.length;i++){
+    const row=activePlacements[i],pose=poseFor(row),stroll=STROLL[row.id];
+    let clock=clocks.get(row.id);
+    if(!clock){clock={t:0};clocks.set(row.id,clock);}
+    if(hold!==row.id)clock.t+=dt;
+    if(stroll){
+      const ang=clock.t*OMEGA+stroll.phase,x=row.x+Math.cos(ang)*stroll.rx,y=row.y+Math.sin(ang)*stroll.ry;
+      drift=Math.max(drift,Math.hypot(x-pose.x,y-pose.y));
+      pose.x=x;pose.y=y;pose.face=Math.sin(ang)>0?-1:1;pose.bob=hold===row.id?0:Math.abs(Math.sin(ang*4))*4;
+    }
+    insert(pose);
+  }
+  driftSinceProbe+=drift;
+}
 function rebuild(){
   try{
     const api=content();const next=[];grid=new Map();maxInteractionRadius=0;
     for(const row of PLACEMENTS){
       const npc=api?.getNpc?.(row.id);
-      if(!npc||npc.enabled===false)continue;
-      next.push(row);insert(row);maxInteractionRadius=Math.max(maxInteractionRadius,Number(row.interactionRadius)||0);
+      if(!npc||npc.enabled===false){poses.delete(row.id);clocks.delete(row.id);continue;}
+      next.push(row);insert(poseFor(row));maxInteractionRadius=Math.max(maxInteractionRadius,Number(row.interactionRadius)||0);
     }
     activePlacements=Object.freeze(next.slice());rebuilds++;lastError=null;probe(true);return activePlacements;
   }catch(error){lastError=String(error&&error.message||error);return activePlacements;}
@@ -88,7 +128,9 @@ function probe(force){
   const p=position();const nextSurface=surface();
   if(!p||nextSurface!=='world'){lastSurface=nextSurface;setNearest(null);return null;}
   const x=Number(p.x)||0,y=Number(p.y)||0;
-  if(!force&&nextSurface===lastSurface&&Number.isFinite(lastProbeX)&&Math.hypot(x-lastProbeX,y-lastProbeY)<PROBE_STEP)return nearestId;
+  const playerShift=Number.isFinite(lastProbeX)?Math.hypot(x-lastProbeX,y-lastProbeY):Infinity;
+  if(!force&&nextSurface===lastSurface&&playerShift<PROBE_STEP&&driftSinceProbe<DRIFT_PROBE)return nearestId;
+  driftSinceProbe=0;
   lastProbeX=x;lastProbeY=y;lastSurface=nextSurface;probes++;
   const candidates=queryAround(x,y,Math.max(maxInteractionRadius+EXIT_HYSTERESIS,1));spatialCandidates+=candidates.length;
   let best=null,bestDistance=Infinity;
@@ -120,13 +162,14 @@ function drawNpc(context,row){
   ensureCast();
   c.save();c.setTransform(dpr,0,0,dpr,0,0);c.translate(point.x,point.y);c.scale(zoom,zoom);
   c.globalAlpha=.22;c.fillStyle='#000';c.beginPath();c.ellipse(0,17,22,8,0,0,Math.PI*2);c.fill();c.globalAlpha=1;
-  const frame=Number(row.visual&&row.visual.frame),grid=castGrid();
-  if(castImage&&Number.isInteger(frame)&&frame>=0){
-    const sx=(frame%grid.cols)*grid.w,sy=Math.floor(frame/grid.cols)*grid.h;
-    c.imageSmoothingEnabled=true;
-    c.drawImage(castImage,sx,sy,grid.w,grid.h,-CAST_DRAW_W/2,18-CAST_DRAW_H,CAST_DRAW_W,CAST_DRAW_H);
-  }else drawFallback(c,row);
   if(row.id===nearestId){c.strokeStyle='rgba(230,196,99,.85)';c.lineWidth=2;c.beginPath();c.ellipse(0,16,26,10,0,0,Math.PI*2);c.stroke();}
+  c.translate(0,-(row.bob||0));c.scale(row.face||1,1);
+  const frame=Number(row.visual&&row.visual.frame),gridSpec=castGrid();
+  if(castImage&&Number.isInteger(frame)&&frame>=0){
+    const sx=(frame%gridSpec.cols)*gridSpec.w,sy=Math.floor(frame/gridSpec.cols)*gridSpec.h;
+    c.imageSmoothingEnabled=true;
+    c.drawImage(castImage,sx,sy,gridSpec.w,gridSpec.h,-CAST_DRAW_W/2,18-CAST_DRAW_H,CAST_DRAW_W,CAST_DRAW_H);
+  }else drawFallback(c,row);
   c.restore();
   const player=position();
   const labeled=row.id===nearestId||(!!player&&Math.hypot((Number(player.x)||0)-row.x,(Number(player.y)||0)-row.y)<LABEL_RANGE);
@@ -134,13 +177,16 @@ function drawNpc(context,row){
   c.save();c.setTransform(dpr,0,0,dpr,0,0);c.font='800 11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';c.textAlign='center';c.textBaseline='bottom';c.lineWidth=4;c.strokeStyle='rgba(0,0,0,.72)';c.strokeText(npc.name,point.x,point.y-(CAST_DRAW_H-10)*zoom);c.fillStyle='#f3df9b';c.fillText(npc.name,point.x,point.y-(CAST_DRAW_H-10)*zoom);c.restore();return true;
 }
 function render(context){
+  stepStroll(root.performance?.now?.()||Date.now());
+  if(driftSinceProbe>=DRIFT_PROBE)probe(false);
   renderFrames++;const api=root.KeloCamera,view=api?.worldView?.();if(!view||surface()!=='world')return;
   const visible=queryRect(view.left-DRAW_MARGIN,view.top-DRAW_MARGIN,view.right+DRAW_MARGIN,view.bottom+DRAW_MARGIN);for(const row of visible)if(drawNpc(context,row))renderedNpcs++;
 }
 function onKeyDown(event){if(event.defaultPrevented||event.repeat)return;if(String(event.key||'').toLowerCase()!=='e')return;if(!nearestId||interaction()?.getState?.().dialogueOpen)return;event.preventDefault();triggerNearest();}
 function getPlacement(id){return placementById.get(String(id||''))||null;}
-function getNearest(){if(!nearestId)return null;const row=getPlacement(nearestId),npc=content()?.getNpc?.(nearestId);return row&&npc?Object.freeze({id:nearestId,npc,placement:row}):null;}
-function getState(){return Object.freeze({version:VERSION,cellSize:CELL_SIZE,probeStep:PROBE_STEP,exitHysteresis:EXIT_HYSTERESIS,placements:PLACEMENTS.length,activePlacements:activePlacements.length,gridCells:grid.size,maxInteractionRadius,nearestId,rebuilds,probes,spatialCandidates,nearestChanges,renderFrames,renderedNpcs,simulationHookId,renderHookId,lastError,timers:0,intervals:0,raf:0,secondLoop:false,positionWrites:0,collisionWrites:0,persistenceWrites:0});}
+function getNearest(){if(!nearestId)return null;const row=getPlacement(nearestId),npc=content()?.getNpc?.(nearestId),pose=poses.get(nearestId);if(!row||!npc)return null;const placement=pose?Object.freeze({id:row.id,surface:row.surface,x:pose.x,y:pose.y,interactionRadius:row.interactionRadius,visual:row.visual}):row;return Object.freeze({id:nearestId,npc,placement});}
+function strollSnapshot(){const out={};poses.forEach((pose,id)=>{out[id]=Object.freeze({x:Math.round(pose.x),y:Math.round(pose.y)});});return Object.freeze(out);}
+function getState(){return Object.freeze({version:VERSION,cellSize:CELL_SIZE,probeStep:PROBE_STEP,exitHysteresis:EXIT_HYSTERESIS,placements:PLACEMENTS.length,activePlacements:activePlacements.length,gridCells:grid.size,maxInteractionRadius,nearestId,rebuilds,probes,spatialCandidates,nearestChanges,renderFrames,renderedNpcs,simulationHookId,renderHookId,lastError,stroll:true,poses:strollSnapshot(),timers:0,intervals:0,raf:0,secondLoop:false,positionWrites:0,collisionWrites:0,persistenceWrites:0});}
 function install(){
   ensurePrompt();ensureCast();rebuild();
   if(root.KeloSimulation?.after)simulationHookId=root.KeloSimulation.after(OWNER,()=>probe(false),9300);
@@ -152,6 +198,6 @@ function install(){
   root.addEventListener('keydown',onKeyDown);
 }
 root.KeloLiveOpsNpcWorld=Object.freeze({version:VERSION,getState,getPlacement,getNearest,rebuild,probe,triggerNearest});
-root.KELO_LIVEOPS_NPC_WORLD_AUDIT=Object.freeze({version:VERSION,spatialGrid:true,fullNpcScanPerFrame:false,probeOnMeaningfulMovement:true,visibleCellRender:true,centralPrompt:true,touchPrompt:true,keyboardFallback:true,playerPositionWrites:0,collisionAuthority:false,npcAi:false,timers:0,intervals:0,raf:0,secondLoop:false,persistenceWrites:0});
+root.KELO_LIVEOPS_NPC_WORLD_AUDIT=Object.freeze({version:VERSION,spatialGrid:true,fullNpcScanPerFrame:false,probeOnMeaningfulMovement:true,scriptedStroll:true,npcAi:false,visibleCellRender:true,centralPrompt:true,touchPrompt:true,keyboardFallback:true,playerPositionWrites:0,collisionAuthority:false,timers:0,intervals:0,raf:0,secondLoop:false,persistenceWrites:0});
 try{install();}catch(error){lastError=String(error&&error.message||error);try{console.error('[KeloLiveOpsNpcWorld]',error);}catch(_){} }
 })(typeof globalThis!=='undefined'?globalThis:window);
