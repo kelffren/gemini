@@ -137,6 +137,11 @@
       "reason": "Organic roads atlas is retained as an authoring source until a generated runtime package formally registers it in the world asset contract."
     },
     {
+      "path": "assets/kelo-map-tileset.png",
+      "scope": "non-world-ui",
+      "reason": "Creator map-kit tileset is optional editor art acquired through the atlas contract, not the plaza terrain renderer."
+    },
+    {
       "path": "assets/plaza-npc-cast.png",
       "scope": "non-world-ui",
       "reason": "Plaza NPC cast sheet is actor presentation owned by KeloLiveOpsNpcWorld, acquired as the optional plazaNpcs atlas. It is not environment terrain."

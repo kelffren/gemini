@@ -55,6 +55,16 @@
     id:'plaza-npcs', src:assetSrc('assets/plaza-npc-cast.png?v=20261004npc',512,512), retiredVisual:true, width:512, height:512,
     spriteWidth:128, spriteHeight:256, columns:4, spriteCount:7, family:'npc_visual'
   });
+  const mapKitLabels=Object.freeze([
+    'Mármol','Mármol veta','Mármol suave','Obsidiana','Obsidiana veta','Jardín','Jardín claro','Agua',
+    'Agua profunda','Sendero','Borde jardín','Esquina jardín','Rincón jardín','Borde obsidiana','Esquina obsidiana','Rincón obsidiana',
+    'Orilla','Esquina orilla','Filete de oro','Esquina de oro','Medallón','Sendero claro','Borde sendero','Esquina sendero',
+    'Rincón sendero','Agua clara','Borde alberca','Esquina alberca','Rincón alberca','Obsidiana suave','Jardín oscuro','Marco de oro'
+  ]);
+  const mapKitAtlas=Object.freeze({
+    id:'kelo-map-kit', src:assetSrc('assets/kelo-map-tileset.png?v=20261004map',1024,512), width:1024, height:512,
+    tileWidth:128, tileHeight:128, columns:8, tileCount:32, family:'map_kit', tileLabels:mapKitLabels
+  });
   const ruralSoilAtlas = Object.freeze({
     id:'rural-soil', src:resetBlank(128,128), retiredVisual:true, width:128, height:128,
     tileWidth:TILE, tileHeight:TILE, columns:4
@@ -248,8 +258,8 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.14.0', worldTileSize:TILE,
-    atlases:Object.freeze({cesped:cespedAtlas,plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,marbleVariation:marbleVariationAtlas,plazaNature:plazaNatureAtlas,trainingDummy:trainingDummyAtlas,plazaNpcs:plazaNpcsAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
+    version:'1.15.0', worldTileSize:TILE,
+    atlases:Object.freeze({cesped:cespedAtlas,plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,marbleVariation:marbleVariationAtlas,plazaNature:plazaNatureAtlas,trainingDummy:trainingDummyAtlas,plazaNpcs:plazaNpcsAtlas,mapKit:mapKitAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,plazaNatureProps,trainingDummyProp,plazaNpcVisuals,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles
   });

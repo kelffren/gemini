@@ -81,6 +81,8 @@ Estado actual:
 - Studio muestra carpetas visuales para Plaza, Arquitectura, Jardines, Agua, Caminos, Mercado y Bosque.
 - props de demostración pueden aparecer en mapa central mediante `KELO_PROP_CONTRACT` sin crear renderer paralelo.
 
+El kit de mapa `mapKit` (`assets/kelo-map-tileset.png`, 8×4 celdas de 128) entra al catálogo de propiedad como piezas `tile:map-kit:*`. No pinta el terreno de la plaza solo. Los bordes y esquinas se giran en el editor.
+
 ## 6. Studio / World Editor
 
 Entradas principales:

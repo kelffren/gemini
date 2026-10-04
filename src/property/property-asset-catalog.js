@@ -69,10 +69,11 @@
     const rows=Math.max(1,Math.floor((Number(atlas.height)||th)/th));
     const count=Math.min(cols*rows,maxTiles||48);
     const fake={columns:cols,frameWidth:tw,frameHeight:th};
+    const names=Array.isArray(atlas.tileLabels)?atlas.tileLabels:null;
     for(let i=0;i<count;i++){
       register({
         id:`tile:${slug(key)}:${i}`,
-        label:`${label(key)} ${i+1}`,
+        label:names&&names[i]?String(names[i]):`${label(key)} ${i+1}`,
         category:category||'tileset',
         family:key,
         districts:['*'],
