@@ -383,3 +383,123 @@ The desired fantasy is not merely “this watch has +8 attack.” It is:
 “Eight real champions, across several years, personally chose or agreed to work on this exact serial, and their historical power remains embedded in it.”
 
 The passport must always preserve that explanation.
+
+
+## 22. Founder Relic Display — Clan City Hall
+
+Founder watches can be converted from a personal progression asset into a clan-wide strategic relic by physically exhibiting them in the clan City Hall.
+
+### Mutually exclusive modes
+Every Founder watch has one active custody mode at a time:
+
+**Personal Carry**
+- Founder remains in an eligible player's carried inventory.
+- Founder’s Blessing grants the carrier the configured personal XP bonus (initial target: +15% XP).
+- The watch does NOT contribute the City Hall clan bonus.
+- If carried into designated loot-risk PvP, normal Founder drop rules apply.
+
+**City Hall Display**
+- Founder is deposited into a real relic display slot in the clan City Hall.
+- Founder’s personal +15% XP bonus is disabled while displayed.
+- The displayed Founder grants an initial +1% XP to eligible members of that clan.
+- The watch remains the same unique serial with its full provenance; it is not copied or converted into a generic buff.
+- Removing it from display immediately ends its clan bonus and allows it to return to an eligible custody state.
+
+A Founder can never grant both its personal and City Hall XP bonuses simultaneously.
+
+### Physical visibility
+Displayed Founders must be inspectable objects in the City Hall, not invisible account flags.
+
+Players should be able to inspect:
+- serial number
+- nickname/title
+- owner/custodian/clan
+- Genesis status
+- Champion Stars
+- Mastery Imprints
+- Battle Scars
+- provenance timeline
+- Population Report
+- historical power
+- time displayed by current clan
+
+Example:
+
+DIAMONDS CITY HALL
+RELICS ON DISPLAY
+
+FOUNDERS #007 — THE KINGMAKER
+FOUNDERS #031
+FOUNDERS #088
+
+Clan Inspiration: +3% XP (example before any diminishing-return rules)
+Relics displayed: 3
+
+### Clan Inspiration
+Initial balancing target:
+1 displayed Founder = +1% clan XP.
+
+The stacking function must be server-configurable. Do not permanently hard-code linear stacking. Large collections may use diminishing returns, display-slot limits, clan-size normalization, or another tested curve if unrestricted stacking becomes dominant.
+
+Raw relic count and historical prestige remain visible even if effective gameplay bonus uses diminishing returns.
+
+### Strategic and emotional purpose
+City Hall display turns a Founder into visible clan capital.
+
+The intended decision is:
+- keep the Founder personally for a large individual advantage;
+- or sacrifice that personal advantage to improve the whole clan.
+
+This should create negotiation and internal clan politics over custody, display, war risk and allocation of scarce Founders.
+
+A clan possessing multiple Founders should visibly feel prestigious and strategically important without making new clans permanently noncompetitive.
+
+### Ownership and custody
+Displaying a Founder does not erase ownership/provenance.
+
+The ledger records:
+- deposited_to_city_hall
+- removed_from_city_hall
+- clan_display_started
+- clan_display_ended
+- clan custody duration
+
+The implementation must explicitly define whether legal ownership remains with the depositing player, transfers to clan treasury custody, or depends on the clan's configured relic policy. The UI must show the consequence before deposit.
+
+### Conflict integration
+Founder displays are intended to become objectives for future clan conflict systems.
+
+If later versions permit City Hall raids or relic capture:
+- capture must happen only through explicitly designated opt-in/declared clan-war rules;
+- the exact unique watch changes custody;
+- no duplicate is created;
+- the losing clan immediately loses that relic's Clan Inspiration contribution;
+- the capturing clan may later display the same serial and gain its eligible bonus;
+- the capture becomes a permanent Battle Scar/provenance event.
+
+Example:
+Captured from DIAMONDS City Hall by BLACK WOLVES — Season 9.
+Displayed as enemy trophy for 43 days.
+Reclaimed by DIAMONDS — Season 10.
+
+This makes stealing a Founder strategically meaningful: the victor can remove progression utility from a rival, acquire a scarce collector artifact, and potentially convert it into its own clan progression.
+
+### Anti-exploit rules
+- A serial can exist in only one custody/display state.
+- Display bonuses are server-authoritative.
+- Moving between personal/display modes cannot duplicate XP rewards.
+- Clan hopping cannot leave stale bonuses.
+- A Founder in escrow, trade, transfer, or unresolved capture state grants no conflicting duplicate bonus.
+- Offline/inactive ownership does not clone display effects.
+- Audit every custody transition in the immutable provenance ledger.
+
+### Design principle
+Founder watches represent scarce, visible power.
+
+Personal Carry answers:
+“What does owning this relic do for ME?”
+
+City Hall Display answers:
+“What does our clan possessing this relic do for US?”
+
+The player or clan must choose. The same Founder must never answer both questions at full strength simultaneously.
