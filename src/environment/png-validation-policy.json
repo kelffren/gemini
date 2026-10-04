@@ -135,6 +135,11 @@
       "path": "assets/world/roads/kelo-organic-roads-atlas.png",
       "scope": "source-sheet",
       "reason": "Organic roads atlas is retained as an authoring source until a generated runtime package formally registers it in the world asset contract."
+    },
+    {
+      "path": "assets/plaza-npc-cast.png",
+      "scope": "non-world-ui",
+      "reason": "Plaza NPC cast sheet is actor presentation owned by KeloLiveOpsNpcWorld, acquired as the optional plazaNpcs atlas. It is not environment terrain."
     }
   ]
 }

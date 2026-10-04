@@ -167,6 +167,10 @@ El runtime continúa consumiendo las rutas actuales hasta un pass separado de pr
 - Economy/logistics: `KeloRegionalEconomy`, `KeloCaravans`, `KeloFactions`.
 - Property/instances: `KELO_PROPERTY_CATALOG`, `PropertySystem`, InstanceSystem.
 
+### Plaza NPC cast
+
+La gente hablable de la plaza es `KeloLiveOpsNpcWorld` (post-boot), no un renderer nuevo. Texto y misiones: `src/systems/liveops-world-content.json`. Sprites: atlas opcional `plazaNpcs` vía `KELO_ATLAS_CONTRACT`. El frame vive en el placement, no en el JSON HOT. `retiredVisual` del atlas sigue en true para que World Builder no lo use como terreno. No crear un segundo sistema de NPC.
+
 ## 9. Online boundary
 
 El cliente puede predecir/presentar, pero progreso valioso, comercio, PvP competitivo, propiedad y cambios globales deben migrar/fallar hacia autoridad de servidor. `docs/ONLINE_FIRST.md` y los documentos de cada sistema mandan sobre implementaciones locales temporales.

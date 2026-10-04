@@ -52,8 +52,8 @@
     spriteWidth:96, spriteHeight:96, columns:1, spriteCount:1, family:'training_prop'
   });
   const plazaNpcsAtlas = Object.freeze({
-    id:'plaza-npcs', src:resetBlank(288,96), retiredVisual:true, width:288, height:96,
-    spriteWidth:96, spriteHeight:96, columns:3, spriteCount:3, family:'npc_visual'
+    id:'plaza-npcs', src:assetSrc('assets/plaza-npc-cast.png?v=20261004npc',512,512), retiredVisual:true, width:512, height:512,
+    spriteWidth:128, spriteHeight:256, columns:4, spriteCount:7, family:'npc_visual'
   });
   const ruralSoilAtlas = Object.freeze({
     id:'rural-soil', src:resetBlank(128,128), retiredVisual:true, width:128, height:128,
@@ -151,9 +151,16 @@
     gameplayAnchor:Object.freeze({x:1580,y:1680,radius:22}),visualOnly:true
   });
   const plazaNpcVisuals = Object.freeze({
-    portero:Object.freeze({sprite:0,xOffset:-48,yOffset:-72,w:96,h:96,labelYOffset:-34}),
-    joyero:Object.freeze({sprite:1,xOffset:-48,yOffset:-72,w:96,h:96,labelYOffset:-34}),
-    maestro:Object.freeze({sprite:2,xOffset:-48,yOffset:-72,w:96,h:96,labelYOffset:-34})
+    aurelio:Object.freeze({sprite:0,xOffset:-32,yOffset:-128,w:64,h:128,labelYOffset:-132}),
+    donaSol:Object.freeze({sprite:1,xOffset:-32,yOffset:-128,w:64,h:128,labelYOffset:-132}),
+    marco:Object.freeze({sprite:2,xOffset:-32,yOffset:-128,w:64,h:128,labelYOffset:-132}),
+    valentina:Object.freeze({sprite:3,xOffset:-32,yOffset:-128,w:64,h:128,labelYOffset:-132}),
+    izan:Object.freeze({sprite:4,xOffset:-32,yOffset:-128,w:64,h:128,labelYOffset:-132}),
+    leandro:Object.freeze({sprite:5,xOffset:-32,yOffset:-128,w:64,h:128,labelYOffset:-132}),
+    naim:Object.freeze({sprite:6,xOffset:-32,yOffset:-128,w:64,h:128,labelYOffset:-132}),
+    portero:Object.freeze({sprite:4,xOffset:-32,yOffset:-128,w:64,h:128,labelYOffset:-132}),
+    joyero:Object.freeze({sprite:1,xOffset:-32,yOffset:-128,w:64,h:128,labelYOffset:-132}),
+    maestro:Object.freeze({sprite:0,xOffset:-32,yOffset:-128,w:64,h:128,labelYOffset:-132})
   });
 
   const tiles = Object.freeze({
@@ -241,7 +248,7 @@
     })
   });
   window.KELO_TILE_REGISTRY = Object.freeze({
-    version:'1.13.0', worldTileSize:TILE,
+    version:'1.14.0', worldTileSize:TILE,
     atlases:Object.freeze({cesped:cespedAtlas,plaza:atlas,plazaGround:plazaGroundAtlas,transitions:transitionAtlas,grassVariation:grassVariationAtlas,marbleVariation:marbleVariationAtlas,plazaNature:plazaNatureAtlas,trainingDummy:trainingDummyAtlas,plazaNpcs:plazaNpcsAtlas,ruralSoil:ruralSoilAtlas,ruralProps:ruralPropsAtlas,ruralLandmarks:ruralLandmarksAtlas,ruralNature:ruralNatureAtlas}),
     architectureAssets,architecturePrefabs,plazaNatureProps,trainingDummyProp,plazaNpcVisuals,
     tiles,ruralTiles,ruralPropTiles,ruralLandmarkTiles,ruralLandmarkSprites,ruralNatureTiles,ruralNatureSprites,families,transitionMasks,styles

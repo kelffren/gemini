@@ -44,3 +44,12 @@ Event fields: `id`, `revision`, `enabled`, `title`, `summary`, `kind`, `location
 - `pinEvent(id)` / `listEvents()`
 
 A deploy that changes only `src/systems/liveops-world-content.json` is eligible for `hot-data` classification after the owner has registered. JS/schema/runtime-owner changes still require the updater's normal restart path.
+
+## Plaza cast
+
+The plaza people you can talk to are still this catalog plus `KeloLiveOpsNpcWorld`. Sprite frame, atlas and world coordinates stay on that runtime's placements. Do not add sprite fields to this JSON: unknown fields reject the whole catalog.
+
+- Atlas key: `plazaNpcs` (`assets/plaza-npc-cast.png`), acquired only through `KELO_ATLAS_CONTRACT`.
+- `retiredVisual` stays true so World Builder does not treat the cast sheet as terrain.
+- If the sheet is not ready, the same owner draws the geometric fallback. No second renderer.
+- `plaza_guide` remains the giver of `welcome_to_kelo`. The visible name may change without changing that id.

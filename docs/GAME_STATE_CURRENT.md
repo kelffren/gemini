@@ -24,6 +24,7 @@ Kelo World es un juego web 2D top-down mobile-first con mundo social, PvP/Arena,
 - cámara bajo `KeloCamera`;
 - render extensions bajo `KeloRender`;
 - placements/editor bajo `KELO_WORLD_EDIT` + Studio command model.
+- Plaza cast (2026-10-04): siete personajes hablables cerca del spawn. Sprites en `assets/plaza-npc-cast.png`, texto en LiveOps. Aurelio conserva el id `plaza_guide` y la misión de primeros pasos.
 
 ## Forest Plaza
 

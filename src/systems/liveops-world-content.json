@@ -1,23 +1,113 @@
 {
   "schemaVersion": 1,
-  "revision": "starter-liveops-1",
+  "revision": "plaza-cast-20261004",
   "npcs": [
     {
       "id": "plaza_guide",
-      "revision": "1",
+      "revision": "2",
       "enabled": true,
-      "name": "Guía de la Plaza",
-      "role": "Guía",
-      "summary": "Orientación inicial para aventureros que llegan a Kelo World.",
-      "tags": ["starter", "plaza"],
+      "name": "Aurelio",
+      "role": "Rey",
+      "summary": "Rey de la plaza. Orientación inicial para quien llega a Kelo World.",
+      "tags": ["starter", "plaza", "corte"],
       "dialogue": [
         {
           "id": "welcome",
-          "text": "Bienvenido a Kelo World. La plaza es tu punto de partida para conocer el mundo."
+          "text": "Soy Aurelio, Rey de esta plaza. Kelo World empieza aquí, entre mármol y oro."
         },
         {
           "id": "mission_hint",
-          "text": "Explora la plaza y familiarízate con el entorno antes de seguir tu aventura."
+          "text": "Camina, saluda a la corte y quédate el tiempo que quieras. La plaza es de todos."
+        }
+      ]
+    },
+    {
+      "id": "dona_sol",
+      "revision": "1",
+      "enabled": true,
+      "name": "Doña Sol",
+      "role": "Baronesa",
+      "summary": "Joyera de la plaza. Mira las piezas antes que el ruido.",
+      "tags": ["plaza", "corte", "joyeria"],
+      "dialogue": [
+        {
+          "id": "stones",
+          "text": "Las piedras dicen más que las palabras. Si buscas brillo, empieza por el carácter."
+        }
+      ]
+    },
+    {
+      "id": "marco",
+      "revision": "1",
+      "enabled": true,
+      "name": "Marco",
+      "role": "Caballero",
+      "summary": "Anfitrión de la plaza. Orienta sin apurar a nadie.",
+      "tags": ["plaza", "corte"],
+      "dialogue": [
+        {
+          "id": "welcome",
+          "text": "Bienvenido a la plaza. Si te pierdes, sigue el oro: siempre vuelve al centro."
+        }
+      ]
+    },
+    {
+      "id": "valentina",
+      "revision": "1",
+      "enabled": true,
+      "name": "Valentina",
+      "role": "Condesa",
+      "summary": "Socialité de la corte. Escucha tanto como mira.",
+      "tags": ["plaza", "corte"],
+      "dialogue": [
+        {
+          "id": "court",
+          "text": "La corte mira, pero también escucha. Cuéntame qué te trae a Kelo."
+        }
+      ]
+    },
+    {
+      "id": "izan",
+      "revision": "1",
+      "enabled": true,
+      "name": "Izan",
+      "role": "Caballero",
+      "summary": "Guardia de la plaza. Mantiene el paso libre.",
+      "tags": ["plaza", "corte"],
+      "dialogue": [
+        {
+          "id": "calm",
+          "text": "La plaza está en calma. Camina con respeto y nadie te cierra el paso."
+        }
+      ]
+    },
+    {
+      "id": "leandro",
+      "revision": "1",
+      "enabled": true,
+      "name": "Leandro",
+      "role": "Ciudadano",
+      "summary": "Músico de la plaza. Se queda donde hay quien escuche.",
+      "tags": ["plaza", "corte"],
+      "dialogue": [
+        {
+          "id": "listen",
+          "text": "Si la plaza suena, es porque alguien se quedó a escuchar. Quédate un momento."
+        }
+      ]
+    },
+    {
+      "id": "naim",
+      "revision": "1",
+      "enabled": true,
+      "name": "Naim",
+      "role": "Barón",
+      "summary": "Vendedor de piezas que se notan de lejos.",
+      "tags": ["plaza", "corte"],
+      "dialogue": [
+        {
+          "id": "pieces",
+          "text": "No vendo prisa. Vendo piezas que se notan de lejos. Mira con calma."
         }
       ]
     }
