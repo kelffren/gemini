@@ -503,3 +503,161 @@ City Hall Display answers:
 “What does our clan possessing this relic do for US?”
 
 The player or clan must choose. The same Founder must never answer both questions at full strength simultaneously.
+
+
+## 23. Relic Heat — Wealth Makes the Clan a Target
+
+Founder relics must never create only positive snowball progression. A clan that accumulates scarce relics gains prestige and progression, but also becomes increasingly visible, strategically valuable, and desirable to attack.
+
+Core equation:
+
+**More relics → more power → more prestige → more visibility → more enemies → more risk.**
+
+The purpose is to make a wealthy relic-holding clan a natural target of the server rather than a permanently safe dominant faction.
+
+### Relic Heat
+Every clan holding or displaying eligible high-value relics generates **Relic Heat**.
+
+Heat should consider signals such as:
+- number of Founder relics held/displayed;
+- percentage of known Founder supply controlled;
+- collector/historical significance of those relics;
+- duration of concentrated ownership;
+- other future strategic relic categories.
+
+Exact thresholds and formulas are server-configurable and must be balanced through simulation.
+
+Example public status:
+
+DIAMONDS
+Founders displayed: 4
+Clan Inspiration: +4% XP before stacking adjustments
+Relic Heat: EXTREME
+4 Genesis Relics currently exposed to eligible clan-conflict systems
+
+### Public wealth visibility
+Relic wealth should be visible enough to generate desire and conflict.
+
+When allowed by the conflict rules, players can inspect which important relics a clan is publicly displaying, including serials and relevant collector characteristics.
+
+Example:
+
+DIAMONDS RELIC VAULT
+
+FOUNDERS #007 — 4 Champion Stars
+FOUNDERS #012 — Genesis pristine
+FOUNDERS #031 — Former World Champion relic
+FOUNDERS #044 — 382K Legacy XP
+FOUNDERS #089 — 3 War Scars
+
+The motivation should be:
+“They have #007 and we want it,”
+not merely:
+“The quest says kill ten enemies.”
+
+### World Target
+At sufficiently high relic concentration/Heat, a clan can become a **World Target**.
+
+Example:
+
+WORLD TARGET
+
+BLACK WOLVES controls 11 of the original 100 Founder Relics.
+Relic Heat: EXTREME.
+Their City Hall is eligible for increased strategic pressure under the configured war rules.
+
+World Target status is a prestige signal and a danger signal. It must not mean unrestricted griefing or permanent vulnerability. Conflict remains governed by explicit server-authoritative war/raid rules and defined windows.
+
+### Relic Hunts
+High Heat can unlock or increase the frequency/value of scheduled **Relic Hunt** opportunities.
+
+A Relic Hunt is a server-authoritative conflict window in which eligible enemy clans/participants can pursue objectives that may eventually expose a relic vault or displayed relic.
+
+A hunt should involve meaningful intermediate objectives rather than instant theft:
+- territory access;
+- gates/defensive structures;
+- control points;
+- defenders;
+- vault access conditions;
+- extraction/escape conditions;
+- other PvP objectives.
+
+Exact rules are intentionally left for the clan-war system.
+
+### Wealth creates pressure
+Additional relics should eventually increase strategic burden, not only rewards.
+
+Potential Heat consequences include:
+- greater public visibility;
+- World Target status;
+- more valuable enemy objectives;
+- increased frequency or attractiveness of eligible challenge windows;
+- increasing defensive/logistical cost;
+- stronger incentives for rival clans and mercenaries to participate.
+
+Do not implement arbitrary humiliation debuffs merely for being wealthy. Pressure should emerge primarily from other players having better reasons and opportunities to contest valuable holdings.
+
+### Anti-snowball principle
+A dominant clan must face a real strategic question:
+
+“We can acquire another Founder, but do we want the additional Heat that comes with controlling it?”
+
+The ninth relic may increase prestige and utility while also crossing a Heat threshold that makes the clan substantially more attractive to attack.
+
+This creates a natural counterweight to relic accumulation without making success meaningless.
+
+### Mercenary and alliance economy
+Relic concentration can create secondary player economies.
+
+Supported/emergent behavior may include:
+- clans hiring other clans for defense;
+- mercenaries joining eligible Relic Hunts;
+- alliances formed around protecting or attacking relic holders;
+- KC-funded in-game relic recovery bounties;
+- rival clans financing campaigns to recover specific serials;
+- legitimate in-game information brokerage where supported by game systems.
+
+Example:
+
+RELIC RECOVERY BOUNTY
+Target: FOUNDERS #007
+Reward: 3,000,000 KC
+Condition: successful server-validated recovery/capture event.
+
+These systems must remain in-game and server-authoritative. They must not depend on real-money payments, account theft, impersonation, doxxing, or out-of-game harassment.
+
+### Capturing strategic value
+If a relic is legally captured under an eligible war system:
+- the losing clan immediately loses that relic's active City Hall contribution;
+- the exact serial changes custody;
+- the capture is permanently appended to provenance;
+- the winning side can later place that same relic into an eligible City Hall display;
+- no duplicate or replacement is generated.
+
+Thus a successful capture can simultaneously:
+1. weaken an enemy's progression infrastructure;
+2. transfer a scarce collectible;
+3. increase the victor's prestige;
+4. create a permanent historical event;
+5. potentially increase the victor's own Relic Heat.
+
+Winning therefore creates the next problem: the hunter can become the hunted.
+
+### Emotional objective
+Relic Heat exists to make ownership emotionally meaningful.
+
+A high-value clan should experience:
+- pride from controlling rare artifacts;
+- greed for additional relics;
+- fear of exposing them;
+- pressure to organize defenses;
+- political negotiation over whether to display or hide/carry assets;
+- rivalry when enemies possess a historically important serial;
+- desire for revenge/recovery after a capture.
+
+The system should target competitive pride through transparent in-game accomplishments and losses, never personal harassment.
+
+### Design law
+A clan sitting on a mountain of relic wealth should feel powerful, but it should also feel like the whole server can see the mountain.
+
+Relic ownership is not the end of the game. It creates content for the next conflict.
