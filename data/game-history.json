@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "updatedAt": "2026-10-04T05:55:00.000Z",
+  "title": "Historia de Kelo World",
+  "note": "Crónica oficial versionada. Los eventos LIVE confirmados por servidor se mezclan en la interfaz cuando están disponibles.",
+  "entries": [
+    {
+      "id": "design-founder-100",
+      "type": "foundation",
+      "category": "relics",
+      "importance": 5,
+      "occurredAt": "2026-10-04T05:05:00.000Z",
+      "title": "Nacen los Founders 100",
+      "summary": "Se define una generación irrepetible de 100 relojes Founder con serial único, historia permanente, riesgo PvP y Founder’s Blessing."
+    },
+    {
+      "id": "design-champion-stars",
+      "type": "foundation",
+      "category": "relics",
+      "importance": 4,
+      "occurredAt": "2026-10-04T05:12:00.000Z",
+      "title": "Champion Stars",
+      "summary": "Los campeones obtienen derechos escasos para grabar relojes; cada estrella conserva el poder histórico del campeón al momento del grabado."
+    },
+    {
+      "id": "design-city-hall-relics",
+      "type": "foundation",
+      "category": "clans",
+      "importance": 4,
+      "occurredAt": "2026-10-04T05:22:00.000Z",
+      "title": "Reliquias en City Hall",
+      "summary": "Un Founder puede beneficiar al portador o exhibirse para beneficiar al clan, pero nunca ambas cosas simultáneamente."
+    },
+    {
+      "id": "design-relic-heat",
+      "type": "foundation",
+      "category": "clans",
+      "importance": 5,
+      "occurredAt": "2026-10-04T05:28:00.000Z",
+      "title": "Relic Heat",
+      "summary": "Los clanes que concentran reliquias ganan poder y prestigio, pero se convierten en objetivos naturales del servidor."
+    },
+    {
+      "id": "design-most-wanted",
+      "type": "foundation",
+      "category": "crime",
+      "importance": 5,
+      "occurredAt": "2026-10-04T05:36:00.000Z",
+      "title": "Most Wanted",
+      "summary": "Se diseña el sistema RED, BLACK y BLUE junto al Top 100 de criminales, bounties y recompensas decrecientes anti-farming."
+    },
+    {
+      "id": "design-five-cities",
+      "type": "foundation",
+      "category": "cities",
+      "importance": 5,
+      "occurredAt": "2026-10-04T05:43:00.000Z",
+      "title": "Las Cinco Grandes Ciudades",
+      "summary": "Cinco ciudades conquistables pasan a controlar materiales estratégicos y gobiernos capaces de emitir pasaportes."
+    },
+    {
+      "id": "design-legacy-books",
+      "type": "foundation",
+      "category": "collectibles",
+      "importance": 4,
+      "occurredAt": "2026-10-04T05:49:00.000Z",
+      "title": "Legacy Books",
+      "summary": "Se crean libros transferibles de 30 autógrafos con snapshots históricos de campeones, poder, riqueza verificada y títulos."
+    },
+    {
+      "id": "design-chronicle",
+      "type": "foundation",
+      "category": "world",
+      "importance": 5,
+      "occurredAt": "2026-10-04T05:55:00.000Z",
+      "title": "La Crónica del Mundo",
+      "summary": "Kelo World obtiene un sistema para conservar y leer automáticamente su propia historia desde la Guía."
+    }
+  ]
+}
