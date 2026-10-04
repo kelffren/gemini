@@ -35,9 +35,9 @@ export const KELO_AUTHORED_CAPITAL_QUARTER=Object.freeze({
   ]),
   landmarks:Object.freeze([
     L('fountain','central_fountain',1800,1650,190,190),
-    L('north_gate','monument',1800,930,260,130,'south'),
-    L('market_anchor','main_market',2220,1540,250,170,'west','commerce'),
-    L('garden_anchor','ancient_tree',1400,1450,180,200,'southeast','residential')
+    L('castle','castle',1800,930,320,180,'south','royal'),
+    L('main_market','main_market',2220,1540,250,170,'west','commerce'),
+    L('ancient_tree','ancient_tree',1400,1450,180,200,'southeast','dark_forest')
   ]),
   // Existing compiled Forest Plaza pieces are deliberately composed into facades,
   // civic edges, market furniture and vegetation. No Math.random / seed decides placement.
