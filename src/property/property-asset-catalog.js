@@ -190,7 +190,8 @@
   // archive rasters stay available for authoring/history but are not fetched by LIVE.
   const EXTRA_SHEETS=Object.freeze([
     {key:'cespedRuntimePng',src:'assets/cesped-runtime.PNG?art=501',tile:32},
-    {key:'arbolesKelo1',src:'assets/Arboleskelo1.PNG?art=306',tile:32}
+    {key:'arbolesKelo1',src:'assets/Arboleskelo1.PNG?art=306',tile:32},
+    {key:'keloAiFantasy',src:'assets/world/tilesets/kelo-ai-fantasy-source.png?art=801',tile:32,maxTiles:48}
   ]);
 
   function registerExtraSheets(){
@@ -201,7 +202,7 @@
         if(!w||!h)return;
         const atlas={id:sheet.key,src:sheet.src,width:w,height:h,tileWidth:sheet.tile,tileHeight:sheet.tile,columns:Math.max(1,Math.floor(w/sheet.tile))};
         try{A?.register?.(sheet.key,atlas,{role:'optional'});}catch(e){}
-        sliceAtlas(sheet.key,atlas,'tileset',48);
+        sliceAtlas(sheet.key,atlas,'tileset',sheet.maxTiles||48);
       };
       img.onerror=function(){console.warn('[Kelo catalog] tileset missing',sheet.src);};
       img.src=sheet.src;
