@@ -106,3 +106,27 @@ If an asset is genuinely visible in the initial viewport but its source atlas co
 - lossy downscaling presented as lossless optimization;
 - timer-based camera polling;
 - permanently retaining offscreen optional atlases.
+
+## Aldea del Estanque content (2026-10-05)
+
+`generated/aldea-del-estanque.js` defines fixed terrain placements, reviewed irregular
+source rectangles and stable prop/collider IDs using the recent fantasy atlas.
+The `aldeaGround` and `aldeaProps` sources are active only while
+`KELO_WORLD_ZONES.active === 'map2'`. Ground uses `paths_floors`; props use the
+existing back/front actor occlusion renderer. No second rendering pipeline exists.
+The source PNG is unchanged; its illustrative cells are not a valid 32px grid.
+Atlas residency remains camera-driven. Empty sources in Plaza avoid eager loading.
+
+Zone entry/exit owns only its `world-zones:map2` collision bucket (pond, walls,
+building footprints and tree trunks). Position changes use `KeloPlayerPosition`;
+proximity uses the existing simulation hook. Content is static and versioned;
+travel currently remains client fallback behind `KELO_WORLD_ZONES.go`, and future
+server validation must authorize the destination before committing the transition.
+`kelo:zonechange` carries the stable zone ID. No economy or progression is mutated.
+Legacy `map2`, `enterMap2`, `returnPlaza` entry points remain compatible. The former
+remote sample-image map choices are replaced by this single authored destination.
+The map is walkable exterior content; doors do not yet lead to interiors.
+Validation: `tests/aldea-del-estanque.spec.js` checks eight-second mobile joystick
+movement, responsiveness, pond collision, return, re-entry and canvas captures.
+Local execution was initially blocked by unavailable browser binaries; the PR
+workflow runs the exact build. Do not claim a PASS until that evidence is read.
