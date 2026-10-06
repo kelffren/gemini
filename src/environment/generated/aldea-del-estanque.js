@@ -60,5 +60,5 @@ colliders.push({id:'aldea:estanque',x:x+pond[0]*T,y:y+pond[1]*T,w:pond[2]*T,h:po
 // Boundary is explicit collision geometry, not a movement clamp or a second physics loop.
 [[0,-32,w,32],[-32,0,32,h],[w,0,32,h],[0,h,w,32]].forEach((b,i)=>colliders.push({id:`aldea:limite-${i}`,x:x+b[0],y:y+b[1],w:b[2],h:b[3],noDraw:true}));
 props.sort((a,b)=>a.occlusion.baseY-b.occlusion.baseY);
-window.KELO_ALDEA_MAP=Object.freeze({id:'aldea-del-estanque',name:'Aldea del Estanque',x,y,w,h,spawn:{x:x+544,y:y+658},portal:{x:x+96,y:y+736,r:42,label:'VOLVER'},asset,ground:Object.freeze(ground),props:Object.freeze(props),colliders:Object.freeze(colliders),revision:1});
+window.KELO_ALDEA_MAP=Object.freeze({id:'aldea-del-estanque',name:'Aldea del Estanque',x,y,w,h,spawn:{x:x+544,y:y+648},portal:{x:x+96,y:y+736,r:42,label:'VOLVER'},asset,ground:Object.freeze(ground),props:Object.freeze(props),colliders:Object.freeze(colliders),revision:1});
 })();
