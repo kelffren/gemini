@@ -4,7 +4,7 @@
  * purpose: prueba el mapa authored en el runtime real con joystick sostenido y captura
  */
 const {test,expect,devices}=require('@playwright/test');
-test.use({...devices['iPhone 13'],viewport:{width:390,height:844},serviceWorkers:'block'});
+test.use({userAgent:devices['iPhone 13'].userAgent,viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:'block'});
 test('Aldea: mobile walking, water collision, return and real canvas',async({page})=>{
  test.setTimeout(90000);
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
