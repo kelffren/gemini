@@ -58,7 +58,7 @@
       window.__KELO_UPDATE_EARLY_HEALTH__=health;
     }
   }catch(e){}
-  window.KELO_WORLD_DECORATION_RESET=false;
+  window.KELO_WORLD_DECORATION_RESET=true;
   try{window.KELO_WORLD_DECORATION_RESET=new URLSearchParams(location.search).get('decorationReset')==='1'}catch(e){}
   window.KELO_HIDE_MINIMAP=true;
   var minimapSelector='#kw-live-minimap,#kelo-minimap,#minimap,.kelo-minimap,.lx-mark,[data-minimap],[id*="minimap" i],[class*="minimap" i],[id*="mini-map" i],[class*="mini-map" i]';
@@ -181,6 +181,5 @@
 <script>window.__keloBootReady=true;window.dispatchEvent(new Event("kelo:boot-ready"));window.__KELO_MINIMAP_PURGE__&&window.__KELO_MINIMAP_PURGE__();</script>
 <script src="src/core/traffic-controller.js?v=1"></script>\n<script src="src/core/warm-cache-client.js?v=3"></script>
 <script src="src/core/post-boot-streamer.js?v=20261004-map-tiles"></script>
-<script type="module" src="src/pve/greenwild-live-boot.js?v=1-wolf-pack"></script>
 <script type="module" src="src/pve/fishing-live-boot.js?v=1"></script>
 </body></html>
