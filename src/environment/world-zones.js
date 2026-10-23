@@ -1,24 +1,20 @@
 /* KELO-INDEX
  * area: ENVIRONMENT / WORLD ZONES
  * owner: KELO_WORLD_ZONES
- * purpose: second-map proof without replacing Plaza; travel is explicit and reversible
+ * purpose: viajes reversibles a una aldea authored; arte por Generic Props y colisiones por KELO_COLLISION
  */
 (function(){
 'use strict';
 const layers=window.KELO_ENVIRONMENT_LAYERS;
 if(!layers?.register){console.error('[Kelo zones] environment layers unavailable');return;}
-const MAP2=Object.freeze({id:'kenney-town-test',name:'Kenney Town · Mapa 2',x:2280,y:180,w:1120,h:900,spawn:{x:2820,y:650}});
-const REAL_MAPS=Object.freeze([
-  Object.freeze({id:'tiny-town',name:'Tiny Town',src:'https://raw.githubusercontent.com/GeorgeQLe/assets-2d-city/main/assets/kenney/tiny-town/Sample.png'}),
-  Object.freeze({id:'rpg-urban',name:'RPG Urban',src:'https://raw.githubusercontent.com/GeorgeQLe/assets-2d-city/main/assets/kenney/rpg-urban-pack/Sample.png'}),
-  Object.freeze({id:'retro-urban',name:'Retro Urban',src:'https://raw.githubusercontent.com/GeorgeQLe/assets-2d-city/main/assets/kenney/retro-urban-kit/Sample.png'})
-]);
-let selectedMap=0;
-const mapImages=REAL_MAPS.map(function(def){const img=new Image();img.crossOrigin='anonymous';img.decoding='async';img.src=def.src;return img;});
+const MAP2=window.KELO_ALDEA_MAP;
+if(!MAP2||!window.KELO_COLLISION||!window.KeloSimulation)return;
+const REAL_MAPS=Object.freeze([MAP2]);
+const COLLISION_OWNER='world-zones:map2';
 const PLAZA_SPAWN=Object.freeze({x:1400,y:1600});
 let active='plaza',cooldownUntil=0;
 const PLAZA_PORTAL=Object.freeze({x:1710,y:1570,r:54,label:'MAPA 2'});
-const MAP2_PORTAL=Object.freeze({x:MAP2.x+90,y:MAP2.y+MAP2.h-90,r:54,label:'VOLVER'});
+const MAP2_PORTAL=MAP2.portal;
 
 function drawPortal(g,p,label){
   const pulse=1+Math.sin(Date.now()/240)*0.08;
@@ -31,46 +27,42 @@ function drawPortal(g,p,label){
   g.restore();
 }
 function drawPlazaPortal(g){if(active==='plaza')drawPortal(g,PLAZA_PORTAL,PLAZA_PORTAL.label);}
-layers.register({id:'kelo-plaza-map2-portal',phase:'props_front',priority:95,required:false,ownership:'KELO_WORLD_ZONES',draw:drawPlazaPortal,bounds:[{id:'plaza-map2-portal',x:PLAZA_PORTAL.x-60,y:PLAZA_PORTAL.y-60,w:120,h:150}]});
-function drawTown(g){
-  if(active!=='map2')return;
-  const r=MAP2,img=mapImages[selectedMap],def=REAL_MAPS[selectedMap];
-  g.save();
-  g.fillStyle='#17221b';g.fillRect(r.x,r.y,r.w,r.h);
-  if(img&&img.complete&&img.naturalWidth){
-    const scale=Math.min((r.w-80)/img.naturalWidth,(r.h-130)/img.naturalHeight);
-    const w=img.naturalWidth*scale,h=img.naturalHeight*scale;
-    g.imageSmoothingEnabled=false;
-    g.drawImage(img,r.x+(r.w-w)/2,r.y+85+(r.h-115-h)/2,w,h);
-  }else{
-    g.fillStyle='#d7c89b';g.font='bold 24px sans-serif';g.textAlign='center';g.fillText('Cargando mapa CC0…',r.x+r.w/2,r.y+r.h/2);
-  }
-  g.strokeStyle='#6c5b45';g.lineWidth=3;g.strokeRect(r.x,r.y,r.w,r.h);
-  g.fillStyle='rgba(10,18,14,.88)';g.fillRect(r.x+20,r.y+18,420,48);
-  g.fillStyle='#fff';g.font='bold 21px sans-serif';g.textAlign='left';g.fillText('MAPA 2 · '+def.name.toUpperCase(),r.x+34,r.y+50);
-  drawPortal(g,MAP2_PORTAL,MAP2_PORTAL.label);
-  g.restore();
-}
-layers.register({id:'kelo-map2-sketch-town-proof',phase:'paths_floors',priority:90,required:false,ownership:'KELO_WORLD_ZONES',draw:drawTown,bounds:[{id:'map2',x:MAP2.x,y:MAP2.y,w:MAP2.w,h:MAP2.h}]});
+layers.register({id:'kelo-plaza-map2-portal',phase:'props_front',priority:95,required:false,ownership:'KELO_WORLD_ZONES',visibleDuringReset:true,draw:drawPlazaPortal,bounds:[{id:'plaza-map2-portal',x:PLAZA_PORTAL.x-60,y:PLAZA_PORTAL.y-60,w:120,h:150}]});
+function drawReturnPortal(g){if(active==='map2')drawPortal(g,MAP2_PORTAL,MAP2_PORTAL.label);}
+layers.register({id:'kelo-map2-return-portal',phase:'props_front',priority:95,required:false,visibleDuringReset:true,ownership:'KELO_WORLD_ZONES',draw:drawReturnPortal,bounds:[{id:'map2-return',x:MAP2_PORTAL.x-65,y:MAP2_PORTAL.y-65,w:130,h:160}]});
 
+// KELO-INDEX WORLD/POSE travel uses the existing discontinuous-position owner.
 function teleport(x,y,source){
-  if(window.KeloPlayerPosition?.teleport)window.KeloPlayerPosition.teleport(x,y,{source,stopMotion:true});
-  else {localPlayer.x=x;localPlayer.y=y;localPlayer.vx=0;localPlayer.vy=0;}
-  if(window.KeloCamera?.setTarget)window.KeloCamera.setTarget(x,y,{source});
-  else {camera.targetX=x;camera.targetY=y;}
+  window.KeloPlayerPosition.teleport(x,y,{source,stopMotion:true});
+  window.KeloCamera?.setTarget(x,y,{source,snap:true});
+  window.KELO_GENERIC_PROPS?.syncResidency();
 }
-function enterMap2(){cooldownUntil=Date.now()+1200;active='map2';teleport(MAP2.spawn.x,MAP2.spawn.y,'kelo-zones:enter-map2');window.showToast?.('Mapa 2 · Sketch Town');}
-function returnPlaza(){cooldownUntil=Date.now()+1200;active='plaza';teleport(PLAZA_SPAWN.x,PLAZA_SPAWN.y,'kelo-zones:return-plaza');window.showToast?.('Plaza Central');}
+function enterMap2(){
+  if(!window.KeloPlayerPosition)return false;
+  cooldownUntil=Date.now()+1200;active='map2';
+  window.KELO_COLLISION.replaceOwner(COLLISION_OWNER,MAP2.colliders);
+  teleport(MAP2.spawn.x,MAP2.spawn.y,'kelo-zones:enter-map2');
+  window.dispatchEvent(new CustomEvent('kelo:zonechange',{detail:{zoneId:MAP2.id,revision:MAP2.revision}}));
+  window.showToast?.(MAP2.name);return true;
+}
+function returnPlaza(){
+  if(!window.KeloPlayerPosition)return false;
+  cooldownUntil=Date.now()+1200;active='plaza';
+  window.KELO_COLLISION.clearOwner(COLLISION_OWNER);
+  teleport(PLAZA_SPAWN.x,PLAZA_SPAWN.y,'kelo-zones:return-plaza');
+  window.dispatchEvent(new CustomEvent('kelo:zonechange',{detail:{zoneId:'plaza'}}));
+  window.showToast?.('Plaza Central');return true;
+}
 function near(p){return typeof localPlayer!=='undefined'&&Math.hypot(localPlayer.x-p.x,localPlayer.y-p.y)<=p.r+24;}
 function tick(){
   if(Date.now()>=cooldownUntil){
     if(active==='plaza'&&near(PLAZA_PORTAL))enterMap2();
     else if(active==='map2'&&near(MAP2_PORTAL))returnPlaza();
   }
-  requestAnimationFrame(tick);
+
 }
-requestAnimationFrame(tick);
-window.KELO_WORLD_ZONES=Object.freeze({version:'zones-v2-real-cc0-maps',realMaps:REAL_MAPS,selectMap(id){const i=REAL_MAPS.findIndex(m=>m.id===id);if(i>=0)selectedMap=i;return REAL_MAPS[selectedMap];},get selectedMap(){return REAL_MAPS[selectedMap];},maps:Object.freeze({plaza:Object.freeze({id:'plaza',name:'Plaza Central'}),map2:MAP2}),get active(){return active;},enterMap2,returnPlaza,go(id){return id==='map2'?enterMap2():returnPlaza();}});
+window.KeloSimulation.after('world-zones:portals',tick,90);
+window.KELO_WORLD_ZONES=Object.freeze({version:'zones-v3-authored-aldea',realMaps:REAL_MAPS,selectMap(){return MAP2;},get selectedMap(){return MAP2;},maps:Object.freeze({plaza:Object.freeze({id:'plaza',name:'Plaza Central'}),map2:MAP2}),get active(){return active;},enterMap2,returnPlaza,go(id){return id==='map2'||id===MAP2.id?enterMap2():returnPlaza();}});
 window.addEventListener('kelo:world-zone-map2',enterMap2);
 window.addEventListener('kelo:world-zone-plaza',returnPlaza);
 })();

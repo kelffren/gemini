@@ -29,7 +29,10 @@
   const FOREST=forestManifest();
   const forestFrames=FOREST?.assets?.length?Object.freeze(Object.fromEntries(FOREST.assets.map(frame=>[String(frame.frameId||frame.assetId),Object.freeze({x:Number(frame.sourceRect?.x)||0,y:Number(frame.sourceRect?.y)||0,w:Math.max(1,Number(frame.sourceRect?.w)||1),h:Math.max(1,Number(frame.sourceRect?.h)||1)})]))):null;
   const forestAsset=forestFrames?Object.freeze({id:'forestPlazaV2',src:'assets/world/plaza/forest-plaza-tileset-v2.png?art=801',width:Number(FOREST.atlas?.width)||1448,height:Number(FOREST.atlas?.height)||1086,frameMode:'irregular',frames:forestFrames}):null;
+  const V=window.KELO_ALDEA_MAP;
   const layerGroups=Object.freeze({
+    aldeaGround:Object.freeze({id:"aldea-ground",ownership:"KELO_WORLD_ZONES",priority:92,renderMode:"layer-stack",visibleDuringReset:true,back:Object.freeze({phase:"paths_floors"})}),
+    aldeaProps:Object.freeze({id:"aldea-props",ownership:"KELO_WORLD_ZONES",priority:92,renderMode:"layer-stack",visibleDuringReset:true,back:Object.freeze({phase:"props_back"}),front:Object.freeze({phase:"props_front"})}),
     plazaNature:Object.freeze({id:'plaza-nature',ownership:'plaza-nature-props-v1',priority:10,renderMode:'layer-stack',back:Object.freeze({phase:'props_back'}),front:Object.freeze({phase:'props_front'})}),
     plazaImperialNature:Object.freeze({id:'plaza-imperial-nature',ownership:'plaza-imperial-nature-v1',priority:12,renderMode:'layer-stack',visibleDuringReset:true,back:Object.freeze({phase:'props_back'}),front:Object.freeze({phase:'props_front'})}),
     plazaForestCompiled:Object.freeze({id:'plaza-forest-compiled',ownership:'kelo-creator-asset-bridge:forest-plaza-v2',priority:14,renderMode:'layer-stack',visibleDuringReset:true,back:Object.freeze({phase:'props_back'}),front:Object.freeze({phase:'props_front'})}),
@@ -40,6 +43,7 @@
     for(const p of R.plazaNatureProps){defs.push(Object.freeze({id:p.id,family:'nature_prop',asset:'plazaNature',frame:(p.frame??p.sprite??0),layerGroup:'plazaNature',layerRole:'back',position:Object.freeze({x:p.x,y:p.y}),size:Object.freeze({w:p.w,h:p.h}),anchor:Object.freeze({x:0.5,y:1}),visualBounds:Object.freeze({x:p.x,y:p.y,w:p.w,h:p.h}),footprint:Object.freeze({x:p.x+Math.round(p.w*0.28),y:p.baseY-18,w:Math.round(p.w*0.44),h:18}),collider:Object.freeze({mode:'none'}),layers:Object.freeze({back:'props_back',front:'props_front'}),priority:10,district:'central',occlusion:Object.freeze({mode:'actor-base-y-clip-v1',baseY:p.baseY,clipPadding:8}),visualOnly:true}));}
   }
   const assets=Object.freeze({
+    ...(V?{aldeaFantasy:V.asset}:{}),
     plazaNature:Object.freeze({id:'plazaNature',src:RESET?null:plazaNatureAtlas?.src,width:plazaNatureAtlas?.width,height:plazaNatureAtlas?.height,frameMode:plazaNatureAtlas?.frameMode,frames:plazaNatureAtlas?.frames,frameWidth:plazaNatureAtlas?.spriteWidth,frameHeight:plazaNatureAtlas?.spriteHeight,columns:plazaNatureAtlas?.columns}),
     plazaRoundTree:Object.freeze({id:'plazaRoundTree',src:'assets/prt-fc9790cb.png',width:1254,height:1254,frameWidth:1254,frameHeight:1254,columns:1}),
     ...(forestAsset?{forestPlazaV2:forestAsset}:{}),
@@ -80,7 +84,10 @@
     add(ruralFrames.CORNER_LEFT,left,top,'corner');add(ruralFrames.CORNER_RIGHT,right-TILE,top,'corner');add(ruralFrames.CORNER_LEFT,left,bottom,'corner');add(ruralFrames.CORNER_RIGHT,right-TILE,bottom,'corner');add(ruralFrames.GATE_OPEN,gateX,top,'gate');add(ruralFrames.FIELD_SIGN,left+TILE,top+TILE,'sign');add(ruralFrames.WEED_A,left-TILE,top+2*TILE,'vegetation');add(ruralFrames.STONE_A,right+6,top+5*TILE,'stone');add(ruralFrames.WEED_B,right+4,bottom-2*TILE,'vegetation');
     return Object.freeze(out);
   }
-  const sources=Object.freeze({ruralFarmBoundary:Object.freeze({id:'ruralFarmBoundary',layerGroup:'ruralBoundary',build:buildRuralFarmBoundary,instances:function(){if(typeof STATE==='undefined'||!STATE||!STATE.farm)return Object.freeze([]);return buildRuralFarmBoundary(STATE.farm);}})});
+  const sources=Object.freeze({
+    aldeaGround:Object.freeze({id:"aldeaGround",layerGroup:"aldeaGround",instances:()=>window.KELO_WORLD_ZONES?.active==="map2"?(V?.ground||[]):[]}),
+    aldeaProps:Object.freeze({id:"aldeaProps",layerGroup:"aldeaProps",instances:()=>window.KELO_WORLD_ZONES?.active==="map2"?(V?.props||[]):[]}),
+    ruralFarmBoundary:Object.freeze({id:'ruralFarmBoundary',layerGroup:'ruralBoundary',build:buildRuralFarmBoundary,instances:function(){if(typeof STATE==='undefined'||!STATE||!STATE.farm)return Object.freeze([]);return buildRuralFarmBoundary(STATE.farm);}})});
   window.KELO_PROP_CONTRACT=Object.freeze({version:'1.10.0',mode:'generic-prop-contract-v10-forest-plaza-playable',assets,layerGroups,props:Object.freeze(defs),sources,getByDistrict(district){return defs.filter(p=>p.district===district);}});
 
   // One-shot content loader. Catalog self-registers immediately if its owner exists, or once on window load.
